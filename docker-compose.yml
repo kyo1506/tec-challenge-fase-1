@@ -1,4 +1,5 @@
 services:
+  # --- Banco de Dados para a sua Aplicação ---
   postgres-db:
     image: postgres:16-alpine
     container_name: postgres-db
@@ -12,24 +13,65 @@ services:
       - postgres_data:/var/lib/postgresql/data
     restart: always
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d TecChallenge"]
       interval: 5s
       timeout: 5s
       retries: 5
-    
+
+  # --- Banco de Dados para o Keycloak (Separado) ---
+  keycloak-db:
+    image: postgres:16-alpine
+    container_name: keycloak-db
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: password # Use uma senha segura em produção
+    ports:
+      - "5434:5432" # Mapeando para uma porta diferente no host
+    volumes:
+      - keycloak_db_data:/var/lib/postgresql/data
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # --- Keycloak ---
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: keycloak
+    command: start-dev
+    environment:
+      KC_DB: postgres
+      KC_DB_URL_HOST: keycloak-db
+      KC_DB_URL_DATABASE: keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: password
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8080:8080"
+    depends_on:
+      keycloak-db:
+        condition: service_healthy # Espera o banco do Keycloak ficar pronto
+    restart: always
+
+  # --- Sua API ---
   api-tec-challenge: 
     container_name: api-tec-challenge
     build: .
     environment:
         ASPNETCORE_ENVIRONMENT: Local 
         DOTNET_RUNNING_IN_CONTAINER: "true"
-        ASPNETCORE_URLS: "http://+:5001" 
+        ASPNETCORE_URLS: "http://+:5001"
     ports:
       - "5001:5001"
     restart: on-failure
     depends_on:
       postgres-db:
-        condition: service_healthy
-      
+        condition: service_healthy # Espera o banco da API ficar pronto
+
 volumes:
   postgres_data:
+  keycloak_db_data:
