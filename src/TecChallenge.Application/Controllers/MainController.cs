@@ -45,7 +45,8 @@ public abstract class MainController : ControllerBase
     protected ActionResult<Root<T>> CustomResponse<T>(
         T? data = null,
         HttpStatusCode statusCode = HttpStatusCode.OK
-    ) where T : class
+    )
+        where T : class
     {
         return OperationValid() ? SuccessResponse(data, statusCode) : ErrorResponse<T>(statusCode);
     }
@@ -53,15 +54,19 @@ public abstract class MainController : ControllerBase
     protected ActionResult<Root<T>> CustomModelStateResponse<T>(
         ModelStateDictionary modelState,
         HttpStatusCode statusCode = HttpStatusCode.OK
-    ) where T : class
+    )
+        where T : class
     {
-        if (!modelState.IsValid) NotifyErrorInvalidModel(modelState);
+        if (!modelState.IsValid)
+            NotifyErrorInvalidModel(modelState);
         return CustomResponse<T>(statusCode: statusCode);
     }
 
-    private ActionResult<Root<T>> SuccessResponse<T>(T? data, HttpStatusCode statusCode) where T : class
+    private ActionResult<Root<T>> SuccessResponse<T>(T? data, HttpStatusCode statusCode)
+        where T : class
     {
-        if ((int)statusCode == StatusCodes.Status204NoContent) return NoContent();
+        if ((int)statusCode == StatusCodes.Status204NoContent)
+            return NoContent();
 
         return StatusCode(
             (int)statusCode,
@@ -69,11 +74,13 @@ public abstract class MainController : ControllerBase
             {
                 StatusCode = (int)statusCode,
                 Success = true,
-                Data = data
-            });
+                Data = data,
+            }
+        );
     }
 
-    private ActionResult<Root<T>> ErrorResponse<T>(HttpStatusCode statusCode) where T : class
+    private ActionResult<Root<T>> ErrorResponse<T>(HttpStatusCode statusCode)
+        where T : class
     {
         var errors = _notifier.GetNotifications().Select(n => n.Message).ToArray();
 
@@ -83,8 +90,9 @@ public abstract class MainController : ControllerBase
             {
                 StatusCode = (int)statusCode,
                 Success = false,
-                Errors = errors
-            });
+                Errors = errors,
+            }
+        );
     }
 
     private void NotifyErrorInvalidModel(ModelStateDictionary modelState)
@@ -102,7 +110,6 @@ public abstract class MainController : ControllerBase
         _notifier.Handle(new Notification(message));
     }
 
-
     protected virtual async Task<string> GetTemplateFile()
     {
         var filePath = Path.Combine(
@@ -118,8 +125,8 @@ public abstract class MainController : ControllerBase
     protected bool HasClaim(string claimName, string claimValue)
     {
         return _appUser.IsAuthenticated()
-               && _appUser
-                   .GetClaimsIdentity()
-                   .Any(c => c.Type == claimName && c.Value.Contains(claimValue));
+            && _appUser
+                .GetClaimsIdentity()
+                .Any(c => c.Type == claimName && c.Value.Contains(claimValue));
     }
 }

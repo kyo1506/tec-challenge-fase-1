@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Options;
 using Serilog;
 using TecChallenge.Application.Configurations;
-using TecChallenge.Application.Data;
 using TecChallenge.Data.Contexts;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -56,8 +55,6 @@ var apiVersionDescriptionProvider =
     app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
 
 app.UseSwaggerConfig(apiVersionDescriptionProvider);
-
-await app.InitializeIdentityDatabase();
 
 app.UseRequestLocalization(
     app.Services.GetRequiredService<IOptions<RequestLocalizationOptions>>().Value

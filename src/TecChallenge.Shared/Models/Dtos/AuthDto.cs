@@ -31,7 +31,10 @@ public class CreateUserDto
     public string Role { get; set; } = string.Empty;
 
     [Required]
-    public IEnumerable<ClaimDto> UserClaims { get; set; } = [];
+    public string FirstName { get; set; } = string.Empty;
+
+    [Required]
+    public string LastName { get; set; } = string.Empty;
 }
 
 public class UserDto
@@ -52,8 +55,6 @@ public class UserDto
     public bool FirstAccess { get; set; }
 
     public bool IsDeleted { get; set; }
-
-    public IEnumerable<ClaimDto>? UserClaims { get; set; }
 }
 
 public class ChangePasswordDto

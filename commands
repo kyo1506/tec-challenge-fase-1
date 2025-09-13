@@ -1,0 +1,4 @@
+docker run --rm -it \
+  -v $(pwd)/ngrok.yml:/etc/ngrok.yml \
+  -e NGROK_CONFIG=/etc/ngrok.yml \
+  ngrok/ngrok:alpine start --all

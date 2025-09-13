@@ -1,0 +1,14 @@
+version: 3
+
+agent:
+  authtoken: 32ScpzndGm6sYhb6h0ABCBIPuqC_28WKMNPbYj4WW9YWCEHF5
+
+tunnels:
+  api:
+    proto: http
+    addr: host.docker.internal:5001
+
+  # Túnel para o Keycloak
+  keycloak:
+    proto: http
+    addr: host.docker.internal:8080

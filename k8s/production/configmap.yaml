@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: tec-challenge-configmap
+  name: tech-challenge-configmap
   namespace: production
 data:
   # Configurações Gerais

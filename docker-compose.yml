@@ -1,43 +1,50 @@
+networks:
+  tech-challenge-net:
+    driver: bridge
+
 services:
-  # --- Banco de Dados para a sua Aplicação ---
-  postgres-db:
+  # --- 1. Base de Dados para a sua Aplicação .NET (Isolada) ---
+  app-db:
     image: postgres:16-alpine
-    container_name: postgres-db
+    container_name: app-db
+    hostname: app-db
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: 12345
-      POSTGRES_DB: TecChallenge
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: TechChallenge
     ports:
       - "5432:5432"
+    networks:
+      - tech-challenge-net
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: always
+      - app_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d TecChallenge"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U appuser -d techchallenge"]
+      interval: 10s
       timeout: 5s
       retries: 5
 
-  # --- Banco de Dados para o Keycloak (Separado) ---
+  # --- 2. Base de Dados para o Keycloak (Isolada) ---
   keycloak-db:
-    image: postgres:16-alpine
+    image: postgres:13-alpine
     container_name: keycloak-db
+    hostname: keycloak-db
     environment:
-      POSTGRES_DB: keycloak
       POSTGRES_USER: keycloak
-      POSTGRES_PASSWORD: password # Use uma senha segura em produção
+      POSTGRES_PASSWORD: keycloakpassword
+      POSTGRES_DB: keycloak
     ports:
-      - "5434:5432" # Mapeando para uma porta diferente no host
+      - "5433:5432"
+    networks:
+      - tech-challenge-net
     volumes:
       - keycloak_db_data:/var/lib/postgresql/data
-    restart: always
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
 
-  # --- Keycloak ---
   keycloak:
     image: quay.io/keycloak/keycloak:latest
     container_name: keycloak
@@ -47,31 +54,17 @@ services:
       KC_DB_URL_HOST: keycloak-db
       KC_DB_URL_DATABASE: keycloak
       KC_DB_USERNAME: keycloak
-      KC_DB_PASSWORD: password
+      KC_DB_PASSWORD: keycloakpassword
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
     ports:
       - "8080:8080"
+    networks:
+      - tech-challenge-net
     depends_on:
       keycloak-db:
-        condition: service_healthy # Espera o banco do Keycloak ficar pronto
-    restart: always
-
-  # --- Sua API ---
-  api-tec-challenge: 
-    container_name: api-tec-challenge
-    build: .
-    environment:
-        ASPNETCORE_ENVIRONMENT: Local 
-        DOTNET_RUNNING_IN_CONTAINER: "true"
-        ASPNETCORE_URLS: "http://+:5001"
-    ports:
-      - "5001:5001"
-    restart: on-failure
-    depends_on:
-      postgres-db:
-        condition: service_healthy # Espera o banco da API ficar pronto
+        condition: service_healthy
 
 volumes:
-  postgres_data:
+  app_db_data:
   keycloak_db_data:

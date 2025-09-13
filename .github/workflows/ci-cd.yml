@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
 
 env:
-  ECR_REPOSITORY: fiap-aws/tec-challenge
-  EKS_CLUSTER_NAME: tec-challenge-fiap-cluster
+  ECR_REPOSITORY: fiap-aws/tech-challenge
+  EKS_CLUSTER_NAME: tech-challenge-fiap-cluster
   AWS_REGION: sa-east-1
 
 jobs:

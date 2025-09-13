@@ -1,12 +1,6 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
-using TecChallenge.Application.Data;
-using TecChallenge.Application.Extensions;
-using TecChallenge.Data.Contexts;
 
 namespace TecChallenge.Application.Configurations;
 
@@ -17,101 +11,44 @@ public static class IdentityConfig
         IConfiguration configuration
     )
     {
+        // Adiciona o serviço de autenticação e configura o manipulador do JWT Bearer
         services
-            .AddDbContext<AuthDbContext>(options =>
-                options
-                    .UseNpgsql(
-                        configuration.GetConnectionString("DefaultConnection"),
-                        o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)
-                    )
-                    .ConfigureWarnings(w =>
-                        w.Throw(RelationalEventId.MultipleCollectionIncludeWarning)
-                    )
-                    .UseLazyLoadingProxies()
-            )
-            .AddDefaultIdentity<ApplicationUser>(options =>
+            .AddAuthentication(options =>
             {
-                options.Password.RequireDigit = true;
-                options.Password.RequireLowercase = true;
-                options.Password.RequireUppercase = true;
-                options.Password.RequireNonAlphanumeric = true;
-                options.Password.RequiredLength = 8;
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
             })
-            .AddRoles<ApplicationRole>()
-            .AddEntityFrameworkStores<AuthDbContext>()
-            .AddSignInManager<ApplicationSignInManager>()
-            .AddDefaultTokenProviders();
-
-        var jwtAppSettingOptions = configuration.GetSection(nameof(JwtOptions));
-
-        var securityKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(
-                configuration.GetValue<string>("ApplicationKey")
-                    ?? throw new InvalidOperationException()
-            )
-        );
-
-        services.Configure<JwtOptions>(options =>
-        {
-            options.Issuer = jwtAppSettingOptions[nameof(JwtOptions.Issuer)];
-            options.Audience = jwtAppSettingOptions[nameof(JwtOptions.Audience)];
-            options.SecurityKey = securityKey;
-            options.SigningCredentials = new SigningCredentials(
-                securityKey,
-                SecurityAlgorithms.HmacSha256
-            );
-            options.AccessTokenExpiration = int.Parse(
-                jwtAppSettingOptions[nameof(JwtOptions.AccessTokenExpiration)]
-            );
-            options.RefreshTokenExpiration = int.Parse(
-                jwtAppSettingOptions[nameof(JwtOptions.RefreshTokenExpiration)]
-            );
-        });
-
-        services
-            .AddAuthentication(x =>
+            .AddJwtBearer(options =>
             {
-                x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                x.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-            })
-            .AddJwtBearer(x =>
-            {
-                x.RequireHttpsMetadata = true;
-                x.SaveToken = true;
-                x.TokenValidationParameters = new TokenValidationParameters
+                // URL do seu realm no Keycloak
+                options.Authority = configuration["Jwt:Authority"];
+
+                // Client ID que você criou no Keycloak para esta API
+                options.Audience = configuration["Jwt:Audience"];
+
+                // Em desenvolvimento, podemos desabilitar a verificação de HTTPS
+                options.RequireHttpsMetadata = false;
+
+                options.TokenValidationParameters = new TokenValidationParameters
                 {
+                    // Valida se a assinatura do token é confiável
                     ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = securityKey,
+                    // Valida quem emitiu o token (o seu Keycloak)
                     ValidateIssuer = true,
-                    ValidIssuer = jwtAppSettingOptions[nameof(JwtOptions.Issuer)],
-                    ValidateAudience = false,
-                    ValidAudience = jwtAppSettingOptions[nameof(JwtOptions.Audience)],
+                    // Valida para quem o token foi emitido (sua API)
+                    ValidateAudience = true,
+                    // Valida o tempo de vida do token
                     ValidateLifetime = true,
-                    RequireExpirationTime = true,
+                    // Remove a tolerância de tempo (clock skew) para validação da expiração
                     ClockSkew = TimeSpan.Zero,
                 };
             });
-    }
 
-    public static async Task InitializeIdentityDatabase(this IApplicationBuilder app)
-    {
-        using var scope = app.ApplicationServices.CreateScope();
-        var services = scope.ServiceProvider;
-
-        try
+        // Configura as políticas de autorização baseadas nos papéis (roles) do Keycloak
+        services.AddAuthorization(options =>
         {
-            var appDbContext = services.GetRequiredService<AppDbContext>();
-            var authDbContext = services.GetRequiredService<AuthDbContext>();
-            var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
-            var roleManager = services.GetRequiredService<RoleManager<ApplicationRole>>();
-
-            await DbInitializer.Initialize(appDbContext, authDbContext, userManager, roleManager);
-        }
-        catch (Exception ex)
-        {
-            var logger = services.GetRequiredService<ILogger<Program>>();
-            logger.LogError(ex, "Erro ao inicializar banco de dados do Identity");
-            throw;
-        }
+            options.AddPolicy("Admin", policy => policy.RequireRole("Admin"));
+            options.AddPolicy("User", policy => policy.RequireRole("User"));
+        });
     }
 }

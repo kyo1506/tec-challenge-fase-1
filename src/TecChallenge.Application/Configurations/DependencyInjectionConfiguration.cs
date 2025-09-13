@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using TecChallenge.Application.Extensions;
@@ -8,6 +7,7 @@ using TecChallenge.Data.UnitOfWork;
 using TecChallenge.Domain.Notifications;
 using TecChallenge.Domain.Services;
 using TecChallenge.Infrastructure.Services;
+using TecChallenge.Infrastructure.Services.Keycloak;
 
 namespace TecChallenge.Application.Configurations;
 
@@ -35,13 +35,27 @@ public static class DependencyInjectionConfiguration
 
         services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
 
-        // services.AddSingleton<IEmailService, EmailService>();
-
         services.AddSingleton<IMockEmailService, MockEmailService>();
 
         services.AddScoped<IUser, AspNetUser>();
 
-        services.AddSingleton(new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        // Configura o serviço e o HttpClient para interagir com o Keycloak
+        services.Configure<KeycloakAdminConfig>(
+            services
+                .BuildServiceProvider()
+                .GetRequiredService<IConfiguration>()
+                .GetSection("KeycloakAdmin")
+        );
+
+        services.AddHttpClient<IKeycloakAdminService, KeycloakAdminService>(
+            (serviceProvider, client) =>
+            {
+                var config = serviceProvider
+                    .GetRequiredService<IOptions<KeycloakAdminConfig>>()
+                    .Value;
+                client.BaseAddress = new Uri(config.BaseUrl);
+            }
+        );
 
         services.AddExceptionHandler<GlobalExceptionHandler>();
 

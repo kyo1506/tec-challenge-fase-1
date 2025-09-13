@@ -1,25 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: tec-challenge-app
+  name: tech-challenge-app
   namespace: production
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: tec-challenge
+      app: tech-challenge
   template:
     metadata:
       labels:
-        app: tec-challenge
+        app: tech-challenge
     spec:
       containers:
-      - name: tec-challenge-container
+      - name: tech-challenge-container
         image: IMAGE_TAG_PLACEHOLDER
         ports:
         - containerPort: 80
         envFrom:
         - configMapRef:
-            name: tec-challenge-configmap
+            name: tech-challenge-configmap
         - secretRef:
-            name: tec-challenge-secret
+            name: tech-challenge-secret

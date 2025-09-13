@@ -1,7 +1,7 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: tec-challenge-ingress
+  name: tech-challenge-ingress
   namespace: production
 spec:
   ingressClassName: nginx
@@ -10,7 +10,7 @@ spec:
       paths:
       - backend:
           service:
-            name: tec-challenge-service
+            name: tech-challenge-service
             port:
               number: 80
         path: /

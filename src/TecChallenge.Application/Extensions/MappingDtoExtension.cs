@@ -14,7 +14,7 @@ public static class MappingDtoExtension
             Price = game.Price,
             IsActive = game.IsActive,
             CreatedAt = game.CreatedAt,
-            UpdatedAt = game.UpdatedAt
+            UpdatedAt = game.UpdatedAt,
         };
     }
 
@@ -24,7 +24,7 @@ public static class MappingDtoExtension
         {
             Id = userLibrary.Id,
             UserId = userLibrary.UserId,
-            Items = userLibrary.Items.Select(x => x.MapToDto())
+            Items = userLibrary.Items.Select(x => x.MapToDto()),
         };
     }
 
@@ -36,10 +36,10 @@ public static class MappingDtoExtension
             GameId = item.GameId,
             UserLibraryId = item.UserLibraryId,
             PurchasedAt = item.PurchasedAt,
-            PurchasePrice = item.PurchasePrice
+            PurchasePrice = item.PurchasePrice,
         };
     }
-    
+
     public static PromotionResponse MapToDto(this Promotion promotion)
     {
         return new PromotionResponse
@@ -48,7 +48,7 @@ public static class MappingDtoExtension
             Name = promotion.Name,
             StartDate = promotion.StartDate,
             EndDate = promotion.EndDate,
-            GamesOnSale = promotion.GamesOnSale.Select(x => x.MapToDto())
+            GamesOnSale = promotion.GamesOnSale.Select(x => x.MapToDto()),
         };
     }
 
@@ -59,7 +59,7 @@ public static class MappingDtoExtension
             Id = promotionGame.Id,
             PromotionId = promotionGame.PromotionId,
             GameId = promotionGame.GameId,
-            DiscountPercentage = promotionGame.DiscountPercentage
+            DiscountPercentage = promotionGame.DiscountPercentage,
         };
     }
 }
