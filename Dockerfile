@@ -12,14 +12,14 @@ RUN apk add --no-cache icu-libs
 # Copy the solution file
 COPY *.sln .
 
-# Copy the source code (this creates /src/TecChallenge.Application, etc.)
+# Copy the source code (this creates /src/Fcg.Identity.Api, etc.)
 COPY src/ ./src/
 
 # Restore dependencies for the entire solution
-RUN dotnet restore "TecChallenge.sln"
+RUN dotnet restore "Fcg.Identity.sln"
 
 # Publish the application
-RUN dotnet publish src/TecChallenge.Application/TecChallenge.Application.csproj -c Release -o /app/publish --no-restore
+RUN dotnet publish src/Fcg.Identity.Api/Fcg.Identity.Api.csproj -c Release -o /app/publish --no-restore
 
 # --- Final Stage ---
 FROM mcr.microsoft.com/dotnet/aspnet:${DOTNET_VERSION}-alpine AS final
@@ -40,4 +40,4 @@ RUN chown -R 0:0 /app && \
 EXPOSE 80
 
 # The entrypoint should now correctly point to your application's DLL
-ENTRYPOINT ["dotnet", "TecChallenge.Application.dll"]
+ENTRYPOINT ["dotnet", "Fcg.Identity.Api.dll"]

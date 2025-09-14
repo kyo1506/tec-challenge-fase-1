@@ -1,49 +1,15 @@
-networks:
-  tech-challenge-net:
-    driver: bridge
-
 services:
-  # --- 1. Base de Dados para a sua Aplicação .NET (Isolada) ---
-  app-db:
-    image: postgres:16-alpine
-    container_name: app-db
-    hostname: app-db
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: 1234
-      POSTGRES_DB: TechChallenge
-    ports:
-      - "5432:5432"
-    networks:
-      - tech-challenge-net
-    volumes:
-      - app_db_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U appuser -d techchallenge"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # --- 2. Base de Dados para o Keycloak (Isolada) ---
   keycloak-db:
     image: postgres:13-alpine
     container_name: keycloak-db
-    hostname: keycloak-db
     environment:
-      POSTGRES_USER: keycloak
-      POSTGRES_PASSWORD: keycloakpassword
       POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: password
     ports:
       - "5433:5432"
-    networks:
-      - tech-challenge-net
     volumes:
       - keycloak_db_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   keycloak:
     image: quay.io/keycloak/keycloak:latest
@@ -52,19 +18,43 @@ services:
     environment:
       KC_DB: postgres
       KC_DB_URL_HOST: keycloak-db
-      KC_DB_URL_DATABASE: keycloak
       KC_DB_USERNAME: keycloak
-      KC_DB_PASSWORD: keycloakpassword
+      KC_DB_PASSWORD: password
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
     ports:
       - "8080:8080"
-    networks:
-      - tech-challenge-net
     depends_on:
-      keycloak-db:
-        condition: service_healthy
+      - keycloak-db
+
+  identity-service-db:
+    image: postgres:16-alpine
+    container_name: identity-db
+    environment:
+      POSTGRES_DB: FcgIdentity
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5434:5432"
+    volumes:
+      - identity_db_data:/var/lib/postgresql/data
+  
+  # identity-api:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: identity-api
+  #   ports:
+  #     - "5002:80"
+  #   depends_on:
+  #     - keycloak
+  #     - identity-service-db
+  #   environment:
+  #     - ASPNETCORE_ENVIRONMENT=Development
+  #     - ConnectionStrings__DefaultConnection=Host=identity-service-db;Database=FcgIdentity;Username=user;Password=password
+  #     - Jwt__Authority=http://keycloak:8080/realms/fiap-cloud-games
+  #     - KeycloakAdmin__BaseUrl=http://keycloak:8080
 
 volumes:
-  app_db_data:
   keycloak_db_data:
+  identity_db_data:
