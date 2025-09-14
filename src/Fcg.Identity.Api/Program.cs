@@ -1,11 +1,9 @@
 using System.Globalization;
 using Asp.Versioning.ApiExplorer;
+using Fcg.Identity.Api.Configurations;
 using Microsoft.AspNetCore.Localization;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Options;
 using Serilog;
-using Fcg.Identity.Api.Configurations;
 
 var builder = WebApplication.CreateBuilder(args);
 

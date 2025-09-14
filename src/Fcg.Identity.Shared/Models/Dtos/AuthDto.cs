@@ -11,7 +11,7 @@ public class LoginDto
     public string Email { get; set; } = string.Empty;
 
     [Required]
-    [StringLength(100, MinimumLength = 6)]
+    // [StringLength(100, MinimumLength = 6)]
     public string Password { get; set; } = string.Empty;
 }
 
@@ -66,7 +66,7 @@ public class ChangePasswordDto
     public string Email { get; set; } = string.Empty;
 
     [Required]
-    [StringLength(100, MinimumLength = 6)]
+    // [StringLength(100, MinimumLength = 6)]
     public string Password { get; set; } = string.Empty;
 
     [Required]
