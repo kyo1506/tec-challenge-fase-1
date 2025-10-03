@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
 using Serilog;
 using Serilog.Events;
-using Fcg.Identity.Api.Extensions;
 
 namespace Fcg.Identity.Api.Configurations;
 

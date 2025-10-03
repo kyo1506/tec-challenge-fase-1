@@ -3,9 +3,12 @@ using Asp.Versioning.ApiExplorer;
 using Fcg.Identity.Api.Configurations;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Logging;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+IdentityModelEventSource.ShowPII = true;
 
 builder
     .Configuration.SetBasePath(Directory.GetCurrentDirectory())

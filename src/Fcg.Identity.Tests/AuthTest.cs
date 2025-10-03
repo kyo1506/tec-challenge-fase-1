@@ -1,9 +1,10 @@
+using Fcg.Identity.Api.V1.Controllers;
+using Fcg.Identity.Domain.Interfaces;
+using Fcg.Identity.Shared.Models.Requests;
+using Fcg.Identity.Shared.Models.Responses;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Moq;
-using Fcg.Identity.Api.V1.Controllers;
-using Fcg.Identity.Domain.Interfaces;
-using Fcg.Identity.Shared.Models.Dtos;
 
 namespace Fcg.Identity.Tests;
 
@@ -37,10 +38,10 @@ public class AuthTest
     public async Task Login_WithInvalidCredentials_ShouldReturnUnauthorized()
     {
         // Arrange
-        var loginDto = new LoginDto { Email = "test@test.com", Password = "wrongpassword" };
+        var loginDto = new LoginRequest { Email = "test@test.com", Password = "wrongpassword" };
         _mockKeycloakAdminService
             .Setup(s => s.LoginAsync(loginDto))
-            .ReturnsAsync((LoginResponseDto?)null);
+            .ReturnsAsync((TokenResponse?)null);
 
         // Act
         var result = await _controller.Login(loginDto);

@@ -22,7 +22,7 @@ public static class DependencyInjectionConfiguration
             services
                 .BuildServiceProvider()
                 .GetRequiredService<IConfiguration>()
-                .GetSection("KeycloakAdmin")
+                .GetSection(nameof(KeycloakConfiguration))
         );
 
         services.AddHttpClient<IKeycloakService, KeycloakService>(

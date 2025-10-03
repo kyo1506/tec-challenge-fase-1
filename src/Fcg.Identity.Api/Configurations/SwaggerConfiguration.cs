@@ -1,5 +1,6 @@
 using System.Reflection;
 using Asp.Versioning.ApiExplorer;
+using Fcg.Identity.Api.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using Microsoft.Extensions.Options;
@@ -19,7 +20,12 @@ public static class SwaggerConfig
         {
             c.OperationFilter<SwaggerDefaultValues>();
 
-            // Adds the security definition for the OAuth2/OpenID Connect flow
+            // Gera a lista de scopes dinamicamente a partir da nossa classe central
+            var definedScopes = AppAuthorizationPolicies
+                .Policies.SelectMany(p => p.Value) // Pega todos os scopes
+                .Distinct() // Remove duplicados
+                .ToDictionary(scope => scope, scope => $"Permissão para {scope}");
+
             c.AddSecurityDefinition(
                 "oauth2",
                 new OpenApiSecurityScheme
@@ -29,31 +35,31 @@ public static class SwaggerConfig
                     {
                         AuthorizationCode = new OpenApiOAuthFlow
                         {
-                            // URL for the authorization endpoint of your Keycloak realm
                             AuthorizationUrl = new Uri(
                                 $"{configuration["Jwt:Authority"]}/protocol/openid-connect/auth"
                             ),
-                            // URL for the token endpoint of your Keycloak realm
                             TokenUrl = new Uri(
                                 $"{configuration["Jwt:Authority"]}/protocol/openid-connect/token"
                             ),
-                            Scopes = new Dictionary<string, string>
-                            {
-                                // Maps the scopes (permissions) to user-friendly descriptions in the Swagger UI
-                                { "users:read", "Permission to read user data" },
-                                {
-                                    "users:manage",
-                                    "Permission to manage users (create/edit/delete)"
-                                },
-                                // Add other scopes from your application here
-                            },
+                            Scopes = definedScopes,
                         },
                     },
                 }
             );
 
-            // Adds a filter to apply the security requirement (the lock icon)
-            // automatically to endpoints that have the [Authorize] attribute
+            c.AddSecurityDefinition(
+                "Bearer",
+                new OpenApiSecurityScheme
+                {
+                    Description = "Insert the JWT token like this: Bearer {your token}",
+                    Name = "Authorization",
+                    Scheme = "Bearer",
+                    BearerFormat = "JWT",
+                    In = ParameterLocation.Header,
+                    Type = SecuritySchemeType.Http,
+                }
+            );
+
             c.OperationFilter<SecurityRequirementsOperationFilter>();
 
             var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
@@ -78,10 +84,8 @@ public static class SwaggerConfig
                 );
             }
 
-            // Configures the Swagger UI to use the OAuth2 authorization flow
-            options.OAuthClientId(configuration["Swagger:ClientId"]);
             options.OAuthAppName("FCG Identity API - Swagger UI");
-            options.OAuthUsePkce(); // Enables the recommended PKCE security standard
+            options.OAuthUsePkce();
         });
     }
 }
@@ -90,41 +94,71 @@ public class SecurityRequirementsOperationFilter : IOperationFilter
 {
     public void Apply(OpenApiOperation operation, OperationFilterContext context)
     {
-        // Checks if the endpoint method has the [Authorize] attribute
-        var hasAuthorize =
-            context.MethodInfo.DeclaringType.GetCustomAttribute<AuthorizeAttribute>() != null
-            || context.MethodInfo.GetCustomAttribute<AuthorizeAttribute>() != null;
+        var hasAllowAnonymous =
+            context.MethodInfo.GetCustomAttribute<AllowAnonymousAttribute>() != null;
+        if (hasAllowAnonymous)
+            return;
 
-        if (hasAuthorize)
+        var policyNames = context
+            .MethodInfo.GetCustomAttributes<AuthorizeAttribute>()
+            .Select(attr => attr.Policy)
+            .Where(p => !string.IsNullOrEmpty(p))
+            .ToList();
+
+        var hasGenericAuthorize =
+            context.MethodInfo.GetCustomAttribute<AuthorizeAttribute>() != null
+            && policyNames.Count == 0;
+        // Verifica se a controller tem [Authorize] e o método não tem política
+        var controllerHasAuthorize =
+            context.MethodInfo.DeclaringType?.GetCustomAttribute<AuthorizeAttribute>() != null
+            && policyNames.Count == 0;
+
+        // Se não houver políticas E nenhum Authorize genérico, o endpoint é público
+        if (policyNames.Count == 0 && !hasGenericAuthorize && !controllerHasAuthorize)
         {
-            // Adds the 401 (Unauthorized) response to the endpoint's documentation
-            operation.Responses.Add("401", new OpenApiResponse { Description = "Unauthorized" });
-            // Adds the 403 (Forbidden) response to the endpoint's documentation
-            operation.Responses.Add("403", new OpenApiResponse { Description = "Forbidden" });
-
-            // Defines the OAuth2 security requirement for this endpoint
-            operation.Security =
-            [
-                new()
-                {
-                    {
-                        new OpenApiSecurityScheme
-                        {
-                            Reference = new OpenApiReference
-                            {
-                                Type = ReferenceType.SecurityScheme,
-                                Id = "oauth2",
-                            },
-                        },
-                        context
-                            .MethodInfo.GetCustomAttributes<AuthorizeAttribute>()
-                            .Select(attr => attr.Policy)
-                            .Where(p => p != null)
-                            .ToList()
-                    },
-                },
-            ];
+            return;
         }
+
+        operation.Responses.TryAdd("401", new OpenApiResponse { Description = "Unauthorized" });
+        operation.Responses.TryAdd("403", new OpenApiResponse { Description = "Forbidden" });
+
+        var requiredScopes = AppAuthorizationPolicies
+            .Policies.Where(p => policyNames.Contains(p.Key))
+            .SelectMany(p => p.Value)
+            .Distinct()
+            .ToList();
+
+        operation.Security =
+        [
+            new()
+            {
+                {
+                    new OpenApiSecurityScheme
+                    {
+                        Reference = new OpenApiReference
+                        {
+                            Type = ReferenceType.SecurityScheme,
+                            Id = "oauth2",
+                        },
+                    },
+                    requiredScopes
+                },
+            },
+            new()
+            {
+                {
+                    new OpenApiSecurityScheme
+                    {
+                        Reference = new OpenApiReference
+                        {
+                            Type = ReferenceType.SecurityScheme,
+                            Id = "Bearer",
+                        },
+                    },
+                    new List<string>()
+                },
+            },
+        ];
     }
 }
 

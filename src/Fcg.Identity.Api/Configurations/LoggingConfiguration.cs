@@ -1,9 +1,5 @@
-using NewRelic.LogEnrichers.Serilog;
-using NpgsqlTypes;
 using Serilog;
 using Serilog.Events;
-using Serilog.Formatting.Json;
-using Serilog.Sinks.PostgreSQL;
 
 namespace Fcg.Identity.Api.Configurations;
 
@@ -14,55 +10,25 @@ public static class LoggingConfiguration
         IConfiguration configuration
     )
     {
-        var connectionString = configuration.GetConnectionString("DefaultConnection");
-
-        var columnWriters = new Dictionary<string, ColumnWriterBase>
-        {
-            { "Message", new RenderedMessageColumnWriter(NpgsqlDbType.Text) },
-            { "MessageTemplate", new MessageTemplateColumnWriter(NpgsqlDbType.Text) },
-            { "Level", new LevelColumnWriter(true, NpgsqlDbType.Varchar) },
-            { "TimeStamp", new TimestampColumnWriter(NpgsqlDbType.TimestampTz) },
-            { "Exception", new ExceptionColumnWriter(NpgsqlDbType.Text) },
-            { "Properties", new PropertiesColumnWriter(NpgsqlDbType.Jsonb) },
-            {
-                "ApplicationName",
-                new SinglePropertyColumnWriter("ApplicationName", PropertyWriteMethod.Raw)
-            },
-        };
-
         Log.Logger = new LoggerConfiguration()
-            .MinimumLevel.Information()
+            // Set the minimum level to Debug to capture everything during diagnostics
+            .MinimumLevel.Debug()
+            // Override noisy sources to keep the log clean
             .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+            .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
             .MinimumLevel.Override("System", LogEventLevel.Warning)
-            .MinimumLevel.Override("HealthChecks", LogEventLevel.Warning)
+            // This is the most important override for your 401 error!
+            .MinimumLevel.Override("Microsoft.AspNetCore.Authentication", LogEventLevel.Information)
             .Enrich.FromLogContext()
-            .Enrich.WithProperty("ApplicationName", "tech-challenge-api")
-            .Enrich.WithThreadId()
-            .Enrich.WithProcessId()
-            .Enrich.WithMachineName()
-            .Enrich.WithEnvironmentName()
-            .Enrich.WithNewRelicLogsInContext()
+            .Enrich.WithProperty("ApplicationName", "fcg-identity-api")
+            // Write to the console for real-time feedback
             .WriteTo.Console()
-            .WriteTo.File(
-                path: "logs/log-.json",
-                rollingInterval: RollingInterval.Day,
-                rollOnFileSizeLimit: true,
-                retainedFileCountLimit: 7,
-                formatter: new NewRelicFormatter()
-            )
-            .WriteTo.PostgreSQL(
-                connectionString: connectionString,
-                tableName: "Log",
-                needAutoCreateTable: false,
-                respectCase: true
-            )
-            .Filter.ByExcluding(logEvent => logEvent.RenderMessage().Contains("HTTP"))
             .CreateLogger();
 
         services.AddLogging(loggingBuilder =>
         {
             loggingBuilder.ClearProviders();
-            loggingBuilder.AddSerilog(Log.Logger, true);
+            loggingBuilder.AddSerilog(Log.Logger, dispose: true);
         });
     }
 }
