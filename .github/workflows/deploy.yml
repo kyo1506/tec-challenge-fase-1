@@ -8,8 +8,8 @@ on:
   workflow_dispatch:
 
 env:
-  ECR_REPOSITORY: fcg-identity/identity-api
-  EKS_CLUSTER_NAME: fcg-identity-cluster
+  ECR_REPOSITORY: fcg-identity-api
+  EKS_CLUSTER_NAME: fcg-identity
   AWS_REGION: sa-east-1
 
 jobs:
@@ -45,6 +45,12 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Verify AWS connection
+        run: |
+          echo "Verificando credenciais AWS..."
+          aws sts get-caller-identity
+          aws eks describe-cluster --name ${{ env.EKS_CLUSTER_NAME }}
+
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
@@ -56,20 +62,37 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
+          echo "Building Docker image..."
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          
+          echo "Pushing to ECR..."
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
       # --- Kubernetes Deploy ---
       - name: Configure Kubectl for EKS
         run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
 
+      - name: Verify EKS connection
+        run: |
+          echo "Verificando conectividade com EKS..."
+          kubectl cluster-info
+          kubectl get nodes
+          echo "Namespaces existentes:"
+          kubectl get namespaces
+
       - name: Deploy to EKS
         run: |
+          echo "Imagem a ser deployada: ${{ steps.build-image.outputs.image }}"
+          
           # Substituir placeholder da imagem
-          sed -i 's|identity-api:latest|${{ steps.build-image.outputs.image }}|g' k8s/production/deployment.yaml
+          sed -i 's|208452488125.dkr.ecr.sa-east-1.amazonaws.com/fcg-identity-api:latest|${{ steps.build-image.outputs.image }}|g' k8s/production/deployment.yaml
+          
+          echo "Verificando substituição da imagem:"
+          grep "image:" k8s/production/deployment.yaml
           
           # Aplicar manifestos na ordem correta
           kubectl apply -f k8s/production/namespace.yaml
@@ -81,7 +104,6 @@ jobs:
           kubectl apply -f k8s/production/infrastructure.yaml
           
           # Aguardar bancos de dados
-          kubectl wait --for=condition=ready pod -l app=identity-db -n identity-system --timeout=300s
           kubectl wait --for=condition=ready pod -l app=keycloak-db -n identity-system --timeout=300s
           kubectl wait --for=condition=ready pod -l app=kong-db -n identity-system --timeout=300s
           kubectl wait --for=condition=ready pod -l app=konga-db -n identity-system --timeout=300s
@@ -111,6 +133,24 @@ jobs:
         if: failure()
         run: |
           echo "Deploy falhou. Executando rollback..."
-          kubectl rollout undo deployment/identity-api -n identity-system
-          kubectl rollout undo deployment/keycloak -n identity-system
-          kubectl rollout undo deployment/kong-gateway -n identity-system
+          
+          # Verificar se kubectl está conectado
+          if kubectl cluster-info &> /dev/null; then
+            echo "Conexão com Kubernetes OK, executando rollback..."
+            
+            # Rollback apenas se os deployments existirem
+            if kubectl get deployment identity-api -n identity-system &> /dev/null; then
+              kubectl rollout undo deployment/identity-api -n identity-system
+            fi
+            
+            if kubectl get deployment keycloak -n identity-system &> /dev/null; then
+              kubectl rollout undo deployment/keycloak -n identity-system
+            fi
+            
+            if kubectl get deployment kong-gateway -n identity-system &> /dev/null; then
+              kubectl rollout undo deployment/kong-gateway -n identity-system
+            fi
+          else
+            echo "Não foi possível conectar ao Kubernetes. Rollback manual necessário."
+            exit 1
+          fi

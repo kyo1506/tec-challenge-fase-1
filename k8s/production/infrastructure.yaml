@@ -24,8 +24,8 @@ spec:
                "--hostname-strict-https=false",
                "--http-enabled=true", 
                "--proxy=edge",
-               "--hostname-url=http://ac7ef6250992e496fa5cc27193a974f5-c64b04f30effec84.elb.sa-east-1.amazonaws.com",
-               "--hostname-admin-url=http://ac7ef6250992e496fa5cc27193a974f5-c64b04f30effec84.elb.sa-east-1.amazonaws.com"]
+               "--hostname-url=http://keycloak-service:8080",
+               "--hostname-admin-url=http://keycloak-service:8080"]
         ports:
         - containerPort: 8080
           name: http

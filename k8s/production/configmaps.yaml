@@ -7,7 +7,7 @@ metadata:
   namespace: identity-system
 data:
   ASPNETCORE_ENVIRONMENT: "Production"
-  ASPNETCORE_URLS: "http://+:80"
+  ASPNETCORE_URLS: "http://*:80"
   AllowedHosts: "*"
   
   # JWT Configuration
@@ -60,4 +60,4 @@ data:
   KONG_PROXY_ERROR_LOG: "/dev/stderr"
   KONG_ADMIN_LISTEN: "0.0.0.0:8001, 0.0.0.0:8444 ssl"
   KONG_ADMIN_GUI_LISTEN: "0.0.0.0:8002"
-  KONG_ADMIN_GUI_URL: "http://localhost:8002"
+  KONG_ADMIN_GUI_URL: "http://kong-admin.fcg-identity.com"

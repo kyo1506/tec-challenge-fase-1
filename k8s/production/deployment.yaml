@@ -55,17 +55,6 @@ spec:
           value: "true"
         - name: NEW_RELIC_LOG_LEVEL
           value: "info"
-        # Elasticsearch Configuration
-        - name: Elasticsearch__Uri
-          valueFrom:
-            secretKeyRef:
-              name: elasticsearch-secrets
-              key: uri
-        - name: Elasticsearch__ApiKey
-          valueFrom:
-            secretKeyRef:
-              name: elasticsearch-secrets
-              key: api-key
         # JWT Configuration
         - name: Jwt__Issuer
           valueFrom:

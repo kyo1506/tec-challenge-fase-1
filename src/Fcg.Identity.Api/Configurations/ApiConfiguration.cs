@@ -78,8 +78,6 @@ public static class ApiConfiguration
 
         app.UseAuthorization();
 
-        app.UseStaticFiles();
-
         app.UseExceptionHandler();
 
         app.UseEndpoints(endpoints =>

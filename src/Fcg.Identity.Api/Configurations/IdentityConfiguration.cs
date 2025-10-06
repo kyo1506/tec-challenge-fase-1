@@ -46,7 +46,8 @@ public static class IdentityConfig
                 "CanManageUsers",
                 policy =>
                     policy.RequireAssertion(context =>
-                        context.User.Identity != null && context.User.Identity.IsAuthenticated
+                        context.User.Identity != null
+                        && context.User.Identity.IsAuthenticated
                         && context.User.HasClaim(c =>
                             c.Type == "scope" && c.Value.Split(' ').Contains("users:manage")
                         )
@@ -70,7 +71,8 @@ public static class IdentityConfig
                 "CanManageProfile",
                 policy =>
                     policy.RequireAssertion(context =>
-                        context.User.Identity != null && context.User.Identity.IsAuthenticated
+                        context.User.Identity != null
+                        && context.User.Identity.IsAuthenticated
                         && context.User.HasClaim(c =>
                             c.Type == "scope" && c.Value.Split(' ').Contains("profiles:manage")
                         )

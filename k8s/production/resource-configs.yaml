@@ -65,26 +65,3 @@ data:
     env:
     - name: DOTNET_SYSTEM_GLOBALIZATION_INVARIANT
       value: "true"
-    - name: ASPNETCORE_URLS
-      value: "http://+:80"
-
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: kong-gateway-hpa
-  namespace: identity-system
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: kong-gateway
-  minReplicas: 2
-  maxReplicas: 3
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 80

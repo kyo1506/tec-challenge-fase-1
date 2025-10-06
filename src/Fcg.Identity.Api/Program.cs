@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Localization;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Logging;
 using Serilog;
-using Serilog.Sinks.Elasticsearch;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,41 +33,7 @@ builder.Services.AddLocalization();
 
 builder.Host.UseSerilog(
     (context, services, configuration) =>
-        configuration
-            .ReadFrom.Configuration(context.Configuration)
-            .ReadFrom.Services(services)
-            .Enrich.FromLogContext()
-            .Enrich.WithMachineName()
-            .Enrich.WithEnvironmentName()
-            .Enrich.WithProperty("ServiceName", "fcg-identity-api")
-            .Enrich.WithProperty("Application", "FCG Identity API")
-            .MinimumLevel.Information()
-            .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
-            .MinimumLevel.Override("System", Serilog.Events.LogEventLevel.Warning)
-            .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
-            .WriteTo.Console(
-                outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} "
-                    + "{NewLine}{Exception}"
-                    + "| RequestId: {RequestId} | UserId: {UserId} | Username: {Username} | SessionId: {SessionId}"
-            )
-            .WriteTo.Elasticsearch(
-                new ElasticsearchSinkOptions(
-                    new Uri(context.Configuration["Elasticsearch:Uri"] ?? "https://localhost:9200")
-                )
-                {
-                    IndexFormat = "fcg-identity-logs-{0:yyyy.MM.dd}",
-                    TypeName = null,
-                    AutoRegisterTemplate = true,
-                    OverwriteTemplate = true,
-                    NumberOfShards = 1,
-                    NumberOfReplicas = 1,
-                    ModifyConnectionSettings = x =>
-                        x.ApiKeyAuthentication(
-                            "DjnAtZkBb1NdWTIe6DAt",
-                            context.Configuration["Elasticsearch:ApiKey"] ?? ""
-                        ),
-                }
-            )
+        configuration.ReadFrom.Configuration(context.Configuration).ReadFrom.Services(services)
 );
 
 builder.Services.Configure<RequestLocalizationOptions>(options =>
