@@ -118,7 +118,7 @@ public class AuthController(
     /// <remarks>
     /// This endpoint returns the information of the user making the request.
     /// Users can only access their own profile information.
-    /// ⚠️ **Requires the permission (scope) `profile:manage`.**
+    /// ⚠️ **Requires the permission (scope) `profiles:manage`.**
     /// </remarks>
     [HttpGet("profile")]
     [Authorize(Policy = "CanManageProfile")]
@@ -142,7 +142,7 @@ public class AuthController(
     /// </summary>
     /// <remarks>
     /// When updating the own profile, the current JWT token becomes obsolete. The response will indicate the need for re-authentication.
-    /// ⚠️ **Requires the permission (scope) `profile:manage`.**
+    /// ⚠️ **Requires the permission (scope) `profiles:manage`.**
     /// </remarks>
     /// <param name="model">Object with the profile data to be updated.</param>
     [HttpPut("profile")]

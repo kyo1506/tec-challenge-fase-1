@@ -1,0 +1,90 @@
+# Configurações de Recursos para Produção
+# Aplique essas configurações nos seus deployments
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: resource-configs
+  namespace: identity-system
+data:
+  # Configurações recomendadas para cada serviço
+  keycloak-resources.yaml: |
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+    # Configuração JVM para Keycloak
+    env:
+    - name: JAVA_OPTS
+      value: "-Xms1g -Xmx2g -XX:+UseG1GC"
+    - name: KC_CACHE_STACK
+      value: kubernetes
+
+  kong-resources.yaml: |
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    # Kong em modo DB-less para melhor performance
+    env:
+    - name: KONG_DATABASE
+      value: "postgres"
+    - name: KONG_WORKER_PROCESSES
+      value: "2"
+
+  postgres-resources.yaml: |
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    # PostgreSQL otimizado
+    env:
+    - name: POSTGRES_INITDB_ARGS
+      value: "--encoding=UTF-8 --lc-collate=pt_BR.UTF-8"
+    - name: POSTGRES_SHARED_PRELOAD_LIBRARIES
+      value: "pg_stat_statements"
+
+  identity-api-resources.yaml: |
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 200m
+        memory: 512Mi
+    # .NET Runtime otimizado
+    env:
+    - name: DOTNET_SYSTEM_GLOBALIZATION_INVARIANT
+      value: "true"
+    - name: ASPNETCORE_URLS
+      value: "http://+:80"
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: kong-gateway-hpa
+  namespace: identity-system
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kong-gateway
+  minReplicas: 2
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80

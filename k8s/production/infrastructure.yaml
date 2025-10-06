@@ -1,0 +1,289 @@
+---
+# Keycloak Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: identity-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      containers:
+      - name: keycloak
+        image: quay.io/keycloak/keycloak:22.0
+        command: ["/opt/keycloak/bin/kc.sh"]
+        args: ["start-dev", 
+               "--hostname-strict=false", 
+               "--hostname-strict-https=false",
+               "--http-enabled=true", 
+               "--proxy=edge",
+               "--hostname-url=http://ac7ef6250992e496fa5cc27193a974f5-c64b04f30effec84.elb.sa-east-1.amazonaws.com",
+               "--hostname-admin-url=http://ac7ef6250992e496fa5cc27193a974f5-c64b04f30effec84.elb.sa-east-1.amazonaws.com"]
+        ports:
+        - containerPort: 8080
+          name: http
+        envFrom:
+        - configMapRef:
+            name: keycloak-config
+        env:
+        - name: KC_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: keycloak-db-password
+        - name: KC_DB_URL
+          value: "jdbc:postgresql://keycloak-db-service:5432/keycloak"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 180
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 10
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 300
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5
+
+---
+# Kong Migrations Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kong-migrations
+  namespace: identity-system
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: kong-migrations
+        image: kong:latest
+        command: ["kong", "migrations", "bootstrap"]
+        envFrom:
+        - configMapRef:
+            name: kong-config
+        env:
+        - name: KONG_PG_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: kong-db-password
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+
+---
+# Kong Gateway Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kong-gateway
+  namespace: identity-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kong-gateway
+  template:
+    metadata:
+      labels:
+        app: kong-gateway
+    spec:
+      initContainers:
+      - name: wait-for-db
+        image: busybox:1.35
+        command: ['sh', '-c', 'until nc -z kong-db-service 5432; do echo waiting for db; sleep 2; done;']
+      containers:
+      - name: kong
+        image: kong:latest
+        ports:
+        - containerPort: 8000
+          name: proxy
+        - containerPort: 8001
+          name: admin
+        - containerPort: 8002
+          name: manager
+        envFrom:
+        - configMapRef:
+            name: kong-config
+        env:
+        - name: KONG_PG_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: kong-db-password
+        - name: KONG_ADMIN_GUI_LISTEN
+          value: "0.0.0.0:8002"
+        - name: KONG_ADMIN_GUI_URL
+          value: "http://127.0.0.1:8002"
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        readinessProbe:
+          httpGet:
+            path: /status
+            port: 8001
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 5
+        livenessProbe:
+          httpGet:
+            path: /status
+            port: 8001
+          initialDelaySeconds: 90
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+---
+# Konga Preparation Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: konga-prepare
+  namespace: identity-system
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+      - name: wait-for-db
+        image: busybox:1.35
+        command: ['sh', '-c', 'until nc -z konga-db-service 5432; do echo waiting for konga db; sleep 2; done;']
+      containers:
+      - name: konga-prepare
+        image: pantsel/konga:latest
+        command: ["/app/start.sh"]
+        args: ["-c", "prepare", "-a", "postgres", "-u", "postgresql://konga:konga123@konga-db-service:5432/konga"]
+        env:
+        - name: DB_ADAPTER
+          value: "postgres"
+        - name: DB_HOST
+          value: "konga-db-service"
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_DATABASE
+          value: "konga"
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: konga-db-user
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: konga-db-password
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "250m"
+
+---
+# Konga Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: konga
+  namespace: identity-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: konga
+  template:
+    metadata:
+      labels:
+        app: konga
+    spec:
+      initContainers:
+      - name: wait-for-prepare
+        image: busybox:1.35
+        command: ['sh', '-c', 'echo "Waiting for konga-prepare job to complete"']
+      containers:
+      - name: konga
+        image: pantsel/konga:latest
+        ports:
+        - containerPort: 1337
+          name: http
+        env:
+        - name: TOKEN_SECRET
+          value: "konga-secret-token-k8s-identity-system"
+        - name: DB_ADAPTER
+          value: "postgres"
+        - name: DB_HOST
+          value: "konga-db-service"
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_DATABASE
+          value: "konga"
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: konga-db-user
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: konga-db-password
+        - name: NODE_ENV
+          value: "production"
+        - name: NO_AUTH
+          value: "false"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 1337
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 1337
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3

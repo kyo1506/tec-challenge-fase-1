@@ -1,25 +1,93 @@
+---
+# Identity API Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: tech-challenge-app
-  namespace: production
+  name: identity-api
+  namespace: identity-system
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: tech-challenge
+      app: identity-api
   template:
     metadata:
       labels:
-        app: tech-challenge
+        app: identity-api
     spec:
       containers:
-      - name: tech-challenge-container
-        image: IMAGE_TAG_PLACEHOLDER
+      - name: identity-api
+        image: 208452488125.dkr.ecr.sa-east-1.amazonaws.com/fcg-identity-api:latest
+        imagePullPolicy: Always  # Always pull the latest image from ECR
         ports:
         - containerPort: 80
         envFrom:
         - configMapRef:
-            name: tech-challenge-configmap
-        - secretRef:
-            name: tech-challenge-secret
+            name: identity-api-config
+        env:
+        - name: KeycloakConfiguration__AdminClientSecret
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-client-secrets
+              key: admin-client-secret
+        - name: KeycloakConfiguration__ApiClientSecret
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-client-secrets
+              key: api-client-secret
+        # New Relic Configuration
+        - name: NEW_RELIC_LICENSE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: newrelic-secrets
+              key: license-key
+        - name: NEW_RELIC_APP_NAME
+          value: "FCG Identity API"
+        - name: CORECLR_ENABLE_PROFILING
+          value: "1"
+        - name: CORECLR_PROFILER
+          value: "{36032161-FFC0-4B61-B559-F6C5D41BAE5A}"
+        - name: CORECLR_NEWRELIC_HOME
+          value: "/usr/local/newrelic"
+        - name: CORECLR_PROFILER_PATH
+          value: "/usr/local/newrelic/libNewRelicProfiler.so"
+        - name: NEW_RELIC_DISTRIBUTED_TRACING_ENABLED
+          value: "true"
+        - name: NEW_RELIC_LOG_LEVEL
+          value: "info"
+        # Elasticsearch Configuration
+        - name: Elasticsearch__Uri
+          valueFrom:
+            secretKeyRef:
+              name: elasticsearch-secrets
+              key: uri
+        - name: Elasticsearch__ApiKey
+          valueFrom:
+            secretKeyRef:
+              name: elasticsearch-secrets
+              key: api-key
+        # JWT Configuration
+        - name: Jwt__Issuer
+          valueFrom:
+            secretKeyRef:
+              name: jwt-secrets
+              key: issuer
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 60
+          periodSeconds: 30

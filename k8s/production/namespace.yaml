@@ -1,4 +1,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: production
+  name: identity-system
+  labels:
+    app: fcg-identity
+    environment: production

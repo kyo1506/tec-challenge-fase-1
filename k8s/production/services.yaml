@@ -1,0 +1,126 @@
+---
+# Identity API Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: identity-api-service
+  namespace: identity-system
+spec:
+  selector:
+    app: identity-api
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 80
+  type: ClusterIP
+
+---
+# Keycloak Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-service
+  namespace: identity-system
+spec:
+  selector:
+    app: keycloak
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
+
+---
+# Keycloak Database Service  
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-db-service
+  namespace: identity-system
+spec:
+  selector:
+    app: keycloak-db
+  ports:
+    - name: postgres
+      protocol: TCP
+      port: 5432
+      targetPort: 5432
+  type: ClusterIP
+
+---
+# Kong Gateway Service (ClusterIP for ingress routing)
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-gateway-service
+  namespace: identity-system
+spec:
+  selector:
+    app: kong-gateway
+  ports:
+    - name: proxy
+      protocol: TCP
+      port: 8000
+      targetPort: 8000
+    - name: admin
+      protocol: TCP
+      port: 8001
+      targetPort: 8001
+    - name: manager
+      protocol: TCP
+      port: 8002
+      targetPort: 8002
+  type: ClusterIP
+
+---
+# Kong Database Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-db-service
+  namespace: identity-system
+spec:
+  selector:
+    app: kong-db
+  ports:
+    - name: postgres
+      protocol: TCP
+      port: 5432
+      targetPort: 5432
+  type: ClusterIP
+
+---
+# Konga Service  
+apiVersion: v1
+kind: Service
+metadata:
+  name: konga-service
+  namespace: identity-system
+spec:
+  selector:
+    app: konga
+  ports:
+    - name: http
+      protocol: TCP
+      port: 1337
+      targetPort: 1337
+  type: ClusterIP
+
+---
+# Konga Database Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: konga-db-service
+  namespace: identity-system
+spec:
+  selector:
+    app: konga-db
+  ports:
+    - name: postgres
+      protocol: TCP
+      port: 5432
+      targetPort: 5432
+  type: ClusterIP

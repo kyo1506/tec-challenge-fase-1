@@ -1,0 +1,116 @@
+name: FCG Identity - CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - feat/auth_microservice_keycloak
+  workflow_dispatch:
+
+env:
+  ECR_REPOSITORY: fcg-identity/identity-api
+  EKS_CLUSTER_NAME: fcg-identity-cluster
+  AWS_REGION: sa-east-1
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy FCG Identity System
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # --- Testes .NET ---
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore Fcg.Identity.sln
+
+      - name: Build solution
+        run: dotnet build Fcg.Identity.sln -c Release --no-restore
+
+      - name: Run tests
+        run: |
+          cd src/Fcg.Identity.Tests/
+          dotnet test --no-build --configuration Release --verbosity normal
+
+      # --- AWS Configuration ---
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # --- Docker Build & Push ---
+      - name: Build, tag, and push image
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      # --- Kubernetes Deploy ---
+      - name: Configure Kubectl for EKS
+        run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Deploy to EKS
+        run: |
+          # Substituir placeholder da imagem
+          sed -i 's|identity-api:latest|${{ steps.build-image.outputs.image }}|g' k8s/production/deployment.yaml
+          
+          # Aplicar manifestos na ordem correta
+          kubectl apply -f k8s/production/namespace.yaml
+          kubectl apply -f k8s/production/secrets.yaml
+          kubectl apply -f k8s/production/configmaps.yaml
+          kubectl apply -f k8s/production/volumes.yaml
+          kubectl apply -f k8s/production/databases.yaml
+          kubectl apply -f k8s/production/services.yaml
+          kubectl apply -f k8s/production/infrastructure.yaml
+          
+          # Aguardar bancos de dados
+          kubectl wait --for=condition=ready pod -l app=identity-db -n identity-system --timeout=300s
+          kubectl wait --for=condition=ready pod -l app=keycloak-db -n identity-system --timeout=300s
+          kubectl wait --for=condition=ready pod -l app=kong-db -n identity-system --timeout=300s
+          kubectl wait --for=condition=ready pod -l app=konga-db -n identity-system --timeout=300s
+          
+          # Deploy da aplicação e ingress
+          kubectl apply -f k8s/production/deployment.yaml
+          kubectl apply -f k8s/production/ingress-aws.yaml
+          kubectl apply -f k8s/production/resource-configs.yaml
+
+      # --- Verificação de Deploy ---
+      - name: Verify Deployment
+        run: |
+          echo "Verificando status do deploy..."
+          kubectl get pods -n identity-system
+          kubectl get svc -n identity-system
+          kubectl get ingress -n identity-system
+          
+          # Aguardar pods ficarem prontos
+          kubectl wait --for=condition=ready pod -l app=identity-api -n identity-system --timeout=300s
+          kubectl wait --for=condition=ready pod -l app=keycloak -n identity-system --timeout=300s
+          kubectl wait --for=condition=ready pod -l app=kong-gateway -n identity-system --timeout=300s
+          
+          echo "Deploy concluído com sucesso!"
+
+      # --- Rollback em caso de falha ---
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Deploy falhou. Executando rollback..."
+          kubectl rollout undo deployment/identity-api -n identity-system
+          kubectl rollout undo deployment/keycloak -n identity-system
+          kubectl rollout undo deployment/kong-gateway -n identity-system

@@ -32,7 +32,7 @@ public static class Permissions
         /// <summary>
         /// Permite gerenciar o próprio perfil (ler e editar)
         /// </summary>
-        public const string Manage = "profile:manage";
+        public const string Manage = "profiles:manage";
     }
 
     /// <summary>

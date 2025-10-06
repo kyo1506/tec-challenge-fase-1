@@ -1,0 +1,44 @@
+---
+# Keycloak Database PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: keycloak-db-pvc
+  namespace: identity-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: gp3
+
+---
+# Kong Database PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kong-db-pvc
+  namespace: identity-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: gp3
+
+---
+# Konga Database PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: konga-db-pvc
+  namespace: identity-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
+  storageClassName: gp3

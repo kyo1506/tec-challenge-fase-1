@@ -116,11 +116,14 @@ O projeto segue os princípios de **Domain-Driven Design (DDD)** e utiliza **inj
 - **Framework**: ASP.NET Core (.NET 9)  
 - **Arquitetura**: MVC + DDD  
 - **Testes**: TDD  
-- **Autenticação**: JWT com refresh token  
+- **Autenticação**: JWT com refresh token + Keycloak  
 - **Validação**: Data Annotations, FluentValidation, EF Mapping  
 - **Documentação**: OpenAPI / Swagger 3.0.4  
 - **Serviços**: Serviço de e-mail mockado (por segurança)  
-- **Banco de dados**: Postgresql 
+- **Banco de dados**: PostgreSQL  
+- **Orquestração**: Kubernetes + Minikube  
+- **Gateway**: Kong Gateway  
+- **Identidade**: Keycloak (OpenID Connect) 
 
 ---
 
@@ -174,7 +177,7 @@ A aplicação possui um único endpoint de verificação de saúde:
 
 ## 🚀 Como Executar
 
-### Utilizando Docker
+### Utilizando Docker (Desenvolvimento)
 
 Na raiz do projeto, execute:
 
@@ -187,6 +190,32 @@ A aplicação estará acessível em:
 - API: http://localhost:5001
 - Swagger: http://localhost:5001/swagger
 - Health Check: http://localhost:5001/health
+
+### Utilizando Kubernetes (Produção)
+
+Para deploy em Kubernetes com Minikube:
+
+```powershell
+# 1. Executar deploy completo
+cd k8s\production
+.\deploy.ps1
+
+# 2. Configurar Keycloak manualmente (seguir guia)
+# Ver: KEYCLOAK_MANUAL_SETUP.md
+
+# 3. Configurar Kong Gateway (opcional)
+.\..\..\kong-microservice-setup.ps1
+```
+
+**Serviços disponíveis:**
+- Kong Gateway: http://localhost:8000
+- Keycloak: http://localhost:8080
+- Identity API: http://localhost:5001 (via port-forward)
+- Konga (Kong Admin): http://localhost:1337
+
+**📖 Documentação adicional:**
+- [Configuração Manual do Keycloak](KEYCLOAK_MANUAL_SETUP.md)
+- [Guia Completo](README-COMPLETE.md)
 
 ## Usuários Padrão (Seed)
 

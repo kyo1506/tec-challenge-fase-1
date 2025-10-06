@@ -1,0 +1,155 @@
+---
+# Keycloak Database
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak-db
+  namespace: identity-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak-db
+  template:
+    metadata:
+      labels:
+        app: keycloak-db
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:13-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: PGDATA
+          value: "/var/lib/postgresql/data/pgdata"
+        - name: POSTGRES_DB
+          value: "keycloak"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: keycloak-db-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: keycloak-db-password
+        volumeMounts:
+        - name: keycloak-db-storage
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: keycloak-db-storage
+        persistentVolumeClaim:
+          claimName: keycloak-db-pvc
+
+---
+# Kong Database
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kong-db
+  namespace: identity-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kong-db
+  template:
+    metadata:
+      labels:
+        app: kong-db
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:16-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: PGDATA
+          value: "/var/lib/postgresql/data/pgdata"
+        - name: POSTGRES_DB
+          value: "kong"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: kong-db-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: kong-db-password
+        volumeMounts:
+        - name: kong-db-storage
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: kong-db-storage
+        persistentVolumeClaim:
+          claimName: kong-db-pvc
+
+---
+# Konga Database
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: konga-db
+  namespace: identity-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: konga-db
+  template:
+    metadata:
+      labels:
+        app: konga-db
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:11.16-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: PGDATA
+          value: "/var/lib/postgresql/data/pgdata"
+        - name: POSTGRES_DB
+          value: "konga"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: konga-db-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: konga-db-password
+        volumeMounts:
+        - name: konga-db-storage
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "250m"
+      volumes:
+      - name: konga-db-storage
+        persistentVolumeClaim:
+          claimName: konga-db-pvc

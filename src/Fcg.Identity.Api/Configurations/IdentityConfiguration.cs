@@ -39,7 +39,7 @@ public static class IdentityConfig
             });
 
         // Configura as políticas de autorização baseadas nos scopes do token JWT
-        // Apenas 3 permissões essenciais: users:manage, users:read e profile:manage
+        // Apenas 3 permissões essenciais: users:manage, users:read e profiles:manage
         services
             .AddAuthorizationBuilder()
             .AddPolicy(
@@ -72,7 +72,7 @@ public static class IdentityConfig
                     policy.RequireAssertion(context =>
                         context.User.Identity != null && context.User.Identity.IsAuthenticated
                         && context.User.HasClaim(c =>
-                            c.Type == "scope" && c.Value.Split(' ').Contains("profile:manage")
+                            c.Type == "scope" && c.Value.Split(' ').Contains("profiles:manage")
                         )
                     )
             );

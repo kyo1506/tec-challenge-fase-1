@@ -18,7 +18,7 @@ COPY src/ ./src/
 # Restore dependencies for the entire solution
 RUN dotnet restore "Fcg.Identity.sln"
 
-# Publish the application
+# Publish the application (New Relic packages already in .csproj)
 RUN dotnet publish src/Fcg.Identity.Api/Fcg.Identity.Api.csproj -c Release -o /app/publish --no-restore
 
 # --- Final Stage ---
@@ -28,7 +28,11 @@ WORKDIR /app
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 ENV HOME=/app
 
+# Install basic packages for New Relic
 RUN apk add --no-cache icu-libs
+
+# New Relic will be configured via environment variables in Kubernetes
+# The NewRelic.Agent NuGet package (already in .csproj) provides the agent
 
 COPY --from=build /app/publish .
 

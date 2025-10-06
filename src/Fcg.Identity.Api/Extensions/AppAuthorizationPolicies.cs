@@ -4,7 +4,7 @@ namespace Fcg.Identity.Api.Extensions;
 
 /// <summary>
 /// Define as políticas de autorização da aplicação baseadas em scopes/permissões.
-/// Apenas as 3 permissões essenciais: users:manage, users:read e profile:manage
+/// Apenas as 3 permissões essenciais: users:manage, users:read e profiles:manage
 /// </summary>
 public static class AppAuthorizationPolicies
 {
@@ -18,7 +18,7 @@ public static class AppAuthorizationPolicies
     {
         { "CanManageUsers", [Permissions.Users.Manage] },
         { "CanReadUsers", [Permissions.Users.Read, Permissions.Users.Manage] },
-        { "CanManageProfile", [Permissions.Profile.Manage] }
+        { "CanManageProfile", [Permissions.Profile.Manage] },
     };
 
     /// <summary>

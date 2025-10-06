@@ -43,25 +43,6 @@ services:
       retries: 5
       start_period: 60s
 
-  identity-service-db:
-    image: postgres:16-alpine
-    container_name: identity-db
-    environment:
-      POSTGRES_DB: FcgIdentity
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-    ports:
-      - "5434:5432"
-    volumes:
-      - identity_db_data:/var/lib/postgresql/data
-    networks:
-      - default
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d FcgIdentity"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   # Kong Database - PostgreSQL mais recente para melhor performance
   kong-db:
     image: postgres:16-alpine
@@ -194,14 +175,11 @@ services:
     ports:
       - "5001:80"  # ✅ Corrigido para 5001
     depends_on:
-      identity-service-db:
-        condition: service_healthy
       keycloak:
         condition: service_started
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:80
-      - ConnectionStrings__DefaultConnection=Host=identity-service-db;Port=5432;Database=FcgIdentity;User Id=user;Password=password
       - Jwt__Authority=http://keycloak:8080/realms/fiap-cloud-games
       - Jwt__Audience=fcg-api
       - KeycloakConfiguration__BaseUrl=http://keycloak:8080
@@ -225,6 +203,5 @@ services:
 
 volumes:
   keycloak_db_data:
-  identity_db_data:
   kong_db_data:
   konga_db_data:

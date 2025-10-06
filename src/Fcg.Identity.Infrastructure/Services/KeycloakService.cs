@@ -51,12 +51,6 @@ public class KeycloakService(
         var keycloakTokenResponse =
             await response.Content.ReadFromJsonAsync<KeycloakTokenResponse>();
 
-        // Log para debug - vamos ver o que o Keycloak retornou
-        if (keycloakTokenResponse != null)
-        {
-            Console.WriteLine($"[DEBUG] Keycloak response scope: {keycloakTokenResponse.Scope}");
-        }
-
         return keycloakTokenResponse?.ToTokenResponse();
     }
 
@@ -404,14 +398,6 @@ public class KeycloakService(
                     _adminAccessToken
                 );
 
-                // ✅ Sucesso no primeiro ou retry
-                if (attempt > 1)
-                {
-                    Console.WriteLine(
-                        $"[SUCCESS] Keycloak token obtained on attempt {attempt}/{maxRetries}"
-                    );
-                }
-
                 return;
             }
             catch (HttpRequestException ex)
@@ -426,28 +412,15 @@ public class KeycloakService(
                 var delay = TimeSpan.FromMilliseconds(
                     baseDelay.TotalMilliseconds * Math.Pow(2, attempt - 1)
                 );
-                Console.WriteLine(
-                    $"[RETRY] Keycloak connection attempt {attempt}/{maxRetries} failed: {ex.Message}"
-                );
-                Console.WriteLine($"[RETRY] Waiting {delay.TotalSeconds:F1}s before retry...");
                 await Task.Delay(delay);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine(
-                    $"[ERROR] Keycloak token request failed on attempt {attempt}/{maxRetries}: {ex.Message}"
-                );
-
                 if (attempt == maxRetries)
                 {
-                    // Limpar token inválido
                     _adminAccessToken = null;
                     _tokenExpiration = DateTime.MinValue;
                     httpClient.DefaultRequestHeaders.Authorization = null;
-
-                    Console.WriteLine(
-                        $"[FATAL] Failed to get Keycloak token after {maxRetries} attempts. Service will be unavailable."
-                    );
                     throw;
                 }
             }
@@ -493,20 +466,6 @@ public class KeycloakService(
 
             if (!response.IsSuccessStatusCode)
             {
-                // Log specific error for insufficient scope (common issue)
-                if (
-                    response.StatusCode == HttpStatusCode.Forbidden
-                    && response.Headers.WwwAuthenticate.Any(h =>
-                        h.Parameter?.Contains("insufficient_scope") == true
-                    )
-                )
-                {
-                    Console.WriteLine(
-                        "[WARNING] Token validation failed: Missing 'openid' scope. Ensure tokens include 'openid' scope for userinfo endpoint access."
-                    );
-                }
-
-                // Token inválido ou expirado
                 return null;
             }
 
@@ -529,11 +488,8 @@ public class KeycloakService(
 
             return fullUserInfo;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            Console.WriteLine(
-                $"[ERROR] KeycloakService - Token validation exception: {ex.Message}"
-            );
             // In case of error, consider token invalid
             return null;
         }
