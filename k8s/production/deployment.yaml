@@ -7,6 +7,11 @@ metadata:
   namespace: identity-system
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: identity-api
@@ -15,6 +20,7 @@ spec:
       labels:
         app: identity-api
     spec:
+      terminationGracePeriodSeconds: 30
       containers:
       - name: identity-api
         image: 208452488125.dkr.ecr.sa-east-1.amazonaws.com/fcg-identity-api:latest
@@ -74,9 +80,13 @@ spec:
             port: 80
           initialDelaySeconds: 30
           periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
         livenessProbe:
           httpGet:
             path: /health
             port: 80
           initialDelaySeconds: 60
           periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5

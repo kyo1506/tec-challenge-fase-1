@@ -31,6 +31,9 @@ builder.Services.AddLoggingConfiguration(builder.Configuration);
 builder.Services.ResolveDependencies();
 builder.Services.AddLocalization();
 
+// Adicionar Serilog para o host (necessário para UseSerilogRequestLogging)
+builder.Host.UseSerilog();
+
 builder.Services.Configure<RequestLocalizationOptions>(options =>
 {
     var supportedCultures = new List<CultureInfo> { new("pt-BR"), new("en-US") };
