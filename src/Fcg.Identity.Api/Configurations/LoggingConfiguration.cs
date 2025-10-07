@@ -1,3 +1,4 @@
+using NewRelic.LogEnrichers.Serilog;
 using Serilog;
 using Serilog.Events;
 
@@ -11,18 +12,13 @@ public static class LoggingConfiguration
     )
     {
         Log.Logger = new LoggerConfiguration()
-            // Set the minimum level to Debug to capture everything during diagnostics
-            .MinimumLevel.Debug()
-            // Override noisy sources to keep the log clean
-            .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
-            .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
-            .MinimumLevel.Override("System", LogEventLevel.Warning)
-            // This is the most important override for your 401 error!
-            .MinimumLevel.Override("Microsoft.AspNetCore.Authentication", LogEventLevel.Information)
-            .Enrich.FromLogContext()
+            // Read base configuration from appsettings.json
+            .ReadFrom.Configuration(configuration)
+            // Add New Relic enricher for APM correlation
+            .Enrich.WithNewRelicLogsInContext()
+            // Additional custom enrichers
             .Enrich.WithProperty("ApplicationName", "fcg-identity-api")
-            // Write to the console for real-time feedback
-            .WriteTo.Console()
+            .Enrich.WithProperty("ServiceName", "fcg-identity-api")
             .CreateLogger();
 
         services.AddLogging(loggingBuilder =>

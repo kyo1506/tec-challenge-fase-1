@@ -1,10 +1,14 @@
 using System.IdentityModel.Tokens.Jwt;
 using Serilog.Context;
 
-namespace Fcg.Identity.Api.Middleware;
+namespace Fcg.Identity.Api.Middlewares;
 
 /// <summary>
-/// Middleware focado apenas em enriquecer logs com contexto de requisição e usuário.
+/// Middleware focado em enriquecer logs com contexto de requisição e usuário.
+///
+/// RequestId: Identificador único da requisição HTTP (gerado pelo Kong ou API)
+/// CorrelationId: Identificador para rastrear operações distribuídas entre múltiplos serviços
+///
 /// Extrai informações do JWT (se presente) e adiciona ao contexto de log do Serilog.
 /// </summary>
 public class LogContextMiddleware(
@@ -15,20 +19,27 @@ public class LogContextMiddleware(
 {
     private readonly RequestDelegate _next = next;
     private readonly ILogger<LogContextMiddleware> _logger = logger;
-    private readonly JwtSecurityTokenHandler _tokenHandler = new JwtSecurityTokenHandler();
+    private readonly JwtSecurityTokenHandler _tokenHandler = new();
     private readonly string? _expectedIssuer = configuration["Jwt:Issuer"];
 
     public async Task InvokeAsync(HttpContext context)
     {
+        // RequestId: Identificador único da requisição (gerado pelo Kong ou API)
         var requestId =
-            context.Request.Headers["X-Request-ID"].FirstOrDefault() ?? context
-                .Request.Headers["X-Correlation-ID"]
+            context.Request.Headers["X-Kong-Request-ID"].FirstOrDefault() ?? Guid.NewGuid()
+                .ToString("N")[..8];
+
+        // CorrelationId: Identificador para rastrear operações distribuídas
+        var correlationId =
+            context.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? context
+                .Request.Headers["X-Request-ID"]
                 .FirstOrDefault()
-            ?? Guid.NewGuid().ToString("N")[..8];
+            ?? Guid.NewGuid().ToString("N")[..12];
 
         var userInfo = ExtractUserInfoFromJwt(context.Request);
 
         using (LogContext.PushProperty("RequestId", requestId))
+        using (LogContext.PushProperty("CorrelationId", correlationId))
         using (LogContext.PushProperty("SessionId", userInfo?.SessionId ?? ""))
         using (LogContext.PushProperty("UserId", userInfo?.UserId ?? ""))
         using (LogContext.PushProperty("Username", userInfo?.Username ?? ""))

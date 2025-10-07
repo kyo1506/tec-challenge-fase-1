@@ -35,8 +35,8 @@ metadata:
   name: identity-api-ingress
   namespace: identity-system
   annotations:
-    # Kong strip-path: false - mantém paths da API
-    konghq.com/strip-path: "false"
+    # Kong strip-path: true - remove o prefixo /identity antes de enviar para a API
+    konghq.com/strip-path: "true"
     # Kong plugins para Identity API
     konghq.com/plugins: identity-cors, identity-rate-limiting, identity-correlation-id
 spec:
@@ -45,7 +45,7 @@ spec:
     - host: api.fcg-identity.com
       http:
         paths:
-          - path: /
+          - path: /identity
             pathType: Prefix
             backend:
               service:

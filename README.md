@@ -270,12 +270,10 @@ kubectl apply -f k8s/production/
 ```
 
 **🌐 URLs de Produção:**
-- **Identity API**: https://api.fcg-identity.com
-- **Keycloak**: https://keycloak.fcg-identity.com
-- **Health Check**: https://api.fcg-identity.com/health
-- **Swagger**: https://api.fcg-identity.com/swagger
-
-**🔧 Funcionalidades Kong Ingress Controller:**
+- **Identity API**: https://api.fcg-identity.com/identity
+- **Keycloak**: https://keycloak.fcg-identity.com  
+- **Health Check**: https://api.fcg-identity.com/identity/health
+- **Swagger**: https://api.fcg-identity.com/identity/swagger**🔧 Funcionalidades Kong Ingress Controller:**
 - ✅ **Rate Limiting**: 200 requests/minuto, 2000/hora
 - ✅ **CORS**: Configurado para origens permitidas
 - ✅ **Correlation ID**: Tracking automático (X-Correlation-ID)
@@ -321,7 +319,7 @@ Utilize-os para fazer login e testar as funcionalidades da aplicação.
 ## 🔐 Autenticação da API
 
 ### 🔑 **Fluxo de Login**
-1. **POST** `https://api.fcg-identity.com/v1/auth/login`
+1. **POST** `https://api.fcg-identity.com/identity/v1/auth/login`
 2. Copie o `accessToken` retornado
 3. Use no header: `Authorization: Bearer {seu_token}`
 4. Renove com `/v1/auth/refresh-token` quando necessário
@@ -393,7 +391,7 @@ kubectl get kongplugin -n identity-system
 ### 📊 **Monitoramento em Tempo Real**
 ```bash
 # Kong Request IDs em tempo real
-curl -H "Host: api.fcg-identity.com" https://api.fcg-identity.com/health
+curl -H "Host: api.fcg-identity.com" https://api.fcg-identity.com/identity/health
 
 # Response headers úteis:
 # X-Kong-Request-Id: tracking único

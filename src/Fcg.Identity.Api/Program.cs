@@ -1,7 +1,7 @@
 using System.Globalization;
 using Asp.Versioning.ApiExplorer;
 using Fcg.Identity.Api.Configurations;
-using Fcg.Identity.Api.Middleware;
+using Fcg.Identity.Api.Middlewares;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Logging;
@@ -15,7 +15,7 @@ NewRelic.Api.Agent.NewRelic.SetApplicationName(
         ?? Environment.GetEnvironmentVariable("NEW_RELIC_LICENSE_KEY")
 );
 
-IdentityModelEventSource.ShowPII = true;
+IdentityModelEventSource.ShowPII = builder.Environment.IsDevelopment();
 
 builder
     .Configuration.SetBasePath(Directory.GetCurrentDirectory())
@@ -30,11 +30,6 @@ builder.Services.AddHealthChecksConfig(builder.Configuration);
 builder.Services.AddLoggingConfiguration(builder.Configuration);
 builder.Services.ResolveDependencies();
 builder.Services.AddLocalization();
-
-builder.Host.UseSerilog(
-    (context, services, configuration) =>
-        configuration.ReadFrom.Configuration(context.Configuration).ReadFrom.Services(services)
-);
 
 builder.Services.Configure<RequestLocalizationOptions>(options =>
 {
