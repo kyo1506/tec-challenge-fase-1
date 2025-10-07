@@ -23,20 +23,7 @@ data:
     - name: KC_CACHE_STACK
       value: kubernetes
 
-  kong-resources.yaml: |
-    resources:
-      requests:
-        cpu: 250m
-        memory: 512Mi
-      limits:
-        cpu: 500m
-        memory: 1Gi
-    # Kong em modo DB-less para melhor performance
-    env:
-    - name: KONG_DATABASE
-      value: "postgres"
-    - name: KONG_WORKER_PROCESSES
-      value: "2"
+  # Kong Gateway removido - usando Kong Ingress Controller externo
 
   postgres-resources.yaml: |
     resources:

@@ -31,9 +31,6 @@ ENV HOME=/app
 # Install basic packages for New Relic
 RUN apk add --no-cache icu-libs
 
-# New Relic will be configured via environment variables in Kubernetes
-# The NewRelic.Agent NuGet package (already in .csproj) provides the agent
-
 COPY --from=build /app/publish .
 
 # This is good practice for security if you need it

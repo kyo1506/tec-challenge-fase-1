@@ -41,23 +41,3 @@ data:
   KC_HEALTH_ENABLED: "true"
   KC_METRICS_ENABLED: "true"
 
----
-# Kong ConfigMap
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: kong-config
-  namespace: identity-system
-data:
-  KONG_DATABASE: "postgres"
-  KONG_PG_HOST: "kong-db-service"
-  KONG_PG_DATABASE: "kong"
-  KONG_PG_USER: "kong"
-  KONG_PG_PASSWORD: "kong123"
-  KONG_ADMIN_ACCESS_LOG: "/dev/stdout"
-  KONG_ADMIN_ERROR_LOG: "/dev/stderr"
-  KONG_PROXY_ACCESS_LOG: "/dev/stdout"
-  KONG_PROXY_ERROR_LOG: "/dev/stderr"
-  KONG_ADMIN_LISTEN: "0.0.0.0:8001, 0.0.0.0:8444 ssl"
-  KONG_ADMIN_GUI_LISTEN: "0.0.0.0:8002"
-  KONG_ADMIN_GUI_URL: "http://kong-admin.fcg-identity.com"

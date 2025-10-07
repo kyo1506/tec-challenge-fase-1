@@ -103,12 +103,10 @@ jobs:
           kubectl apply -f k8s/production/services.yaml
           kubectl apply -f k8s/production/infrastructure.yaml
           
-          # Aguardar bancos de dados
+          # Aguardar banco de dados
           kubectl wait --for=condition=ready pod -l app=keycloak-db -n identity-system --timeout=300s
-          kubectl wait --for=condition=ready pod -l app=kong-db -n identity-system --timeout=300s
-          kubectl wait --for=condition=ready pod -l app=konga-db -n identity-system --timeout=300s
           
-          # Deploy da aplicação e ingress
+          # Deploy da aplicação e Kong Ingress Controller
           kubectl apply -f k8s/production/deployment.yaml
           kubectl apply -f k8s/production/ingress-aws.yaml
           kubectl apply -f k8s/production/resource-configs.yaml
@@ -124,7 +122,6 @@ jobs:
           # Aguardar pods ficarem prontos
           kubectl wait --for=condition=ready pod -l app=identity-api -n identity-system --timeout=300s
           kubectl wait --for=condition=ready pod -l app=keycloak -n identity-system --timeout=300s
-          kubectl wait --for=condition=ready pod -l app=kong-gateway -n identity-system --timeout=300s
           
           echo "Deploy concluído com sucesso!"
 
@@ -147,9 +144,7 @@ jobs:
               kubectl rollout undo deployment/keycloak -n identity-system
             fi
             
-            if kubectl get deployment kong-gateway -n identity-system &> /dev/null; then
-              kubectl rollout undo deployment/kong-gateway -n identity-system
-            fi
+            # Kong Gateway removido - agora usando Kong Ingress Controller externo
           else
             echo "Não foi possível conectar ao Kubernetes. Rollback manual necessário."
             exit 1

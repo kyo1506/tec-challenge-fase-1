@@ -1,83 +1,5 @@
----
-# Kong Gateway Ingress
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: kong-gateway-ingress
-  namespace: identity-system
-  annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "600" 
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
-    # AWS Load Balancer Controller annotations
-    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
-    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
-spec:
-  ingressClassName: nginx
-  rules:
-  - host: kong.fcg-identity.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: kong-gateway-service
-            port:
-              number: 8000
-
----
-# Kong Admin Ingress
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: kong-admin-ingress
-  namespace: identity-system
-  annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
-spec:
-  ingressClassName: nginx
-  rules:
-  - host: kong-admin.fcg-identity.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: kong-gateway-service
-            port:
-              number: 8001
-
----
-# Konga Management UI Ingress
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: konga-ingress
-  namespace: identity-system
-  annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
-spec:
-  ingressClassName: nginx
-  rules:
-  - host: konga.fcg-identity.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: konga-service
-            port:
-              number: 1337
+# Identity System Migration to Kong Ingress Controller
+# Migrando: Keycloak + Identity API + Kong Admin (opcional)
 
 ---
 # Keycloak Ingress
@@ -87,23 +9,23 @@ metadata:
   name: keycloak-ingress
   namespace: identity-system
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    # Kong strip-path: false - mantém o path original para Keycloak
+    konghq.com/strip-path: "false"
+    # Kong plugins para Keycloak
+    konghq.com/plugins: keycloak-cors
 spec:
-  ingressClassName: nginx
+  ingressClassName: kong
   rules:
-  - host: keycloak.fcg-identity.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: keycloak-service
-            port:
-              number: 8080
+    - host: keycloak.fcg-identity.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak-service
+                port:
+                  number: 8080
 
 ---
 # Identity API Ingress
@@ -113,20 +35,116 @@ metadata:
   name: identity-api-ingress
   namespace: identity-system
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    # Kong strip-path: false - mantém paths da API
+    konghq.com/strip-path: "false"
+    # Kong plugins para Identity API
+    konghq.com/plugins: identity-cors, identity-rate-limiting, identity-correlation-id
 spec:
-  ingressClassName: nginx
+  ingressClassName: kong
   rules:
-  - host: api.fcg-identity.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: identity-api-service
-            port:
-              number: 80
+    - host: api.fcg-identity.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: identity-api-service
+                port:
+                  number: 80
+
+# Kong Plugins para Identity System
+---
+# CORS para Keycloak
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: keycloak-cors
+  namespace: identity-system
+plugin: cors
+config:
+  origins:
+    - "*"
+  methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - OPTIONS
+  headers:
+    - Accept
+    - Accept-Version
+    - Content-Length
+    - Content-MD5
+    - Content-Type
+    - Date
+    - Authorization
+    - X-Correlation-ID
+  exposed_headers:
+    - X-Correlation-ID
+  credentials: true
+  max_age: 3600
+  preflight_continue: false
+
+---
+# CORS para Identity API
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: identity-cors
+  namespace: identity-system
+plugin: cors
+config:
+  origins:
+    - "*"
+  methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - OPTIONS
+    - PATCH
+  headers:
+    - Accept
+    - Accept-Version
+    - Content-Length
+    - Content-MD5
+    - Content-Type
+    - Date
+    - Authorization
+    - X-Auth-Token
+    - X-Correlation-ID
+  exposed_headers:
+    - X-Auth-Token
+    - X-Correlation-ID
+  credentials: true
+  max_age: 3600
+  preflight_continue: false
+
+---
+# Rate Limiting para Identity API
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: identity-rate-limiting
+  namespace: identity-system
+plugin: rate-limiting
+config:
+  minute: 200
+  hour: 2000
+  policy: local
+  fault_tolerant: true
+  hide_client_headers: false
+
+---
+# Correlation ID para Identity API
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: identity-correlation-id
+  namespace: identity-system
+plugin: correlation-id
+config:
+  header_name: X-Correlation-ID
+  generator: uuid#counter
+  echo_downstream: true
