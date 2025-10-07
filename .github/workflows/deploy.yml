@@ -103,13 +103,20 @@ jobs:
           kubectl apply -f k8s/production/services.yaml
           kubectl apply -f k8s/production/infrastructure.yaml
           
-          # Aguardar banco de dados
+          # Aguardar banco de dados estar pronto
+          echo "Aguardando banco de dados ficar pronto..."
           kubectl wait --for=condition=ready pod -l app=keycloak-db -n identity-system --timeout=300s
           
-          # Deploy da aplicação e Kong Ingress Controller
+          # Deploy da aplicação (isso vai triggerar rolling update)
+          echo "Aplicando deployment da Identity API..."
           kubectl apply -f k8s/production/deployment.yaml
+          
+          # Aplicar configurações do Kong Ingress Controller
+          echo "Aplicando configurações do ingress..."
           kubectl apply -f k8s/production/ingress-aws.yaml
           kubectl apply -f k8s/production/resource-configs.yaml
+          
+          echo "Manifestos aplicados. Aguardando rollout na próxima etapa..."
 
       # --- Verificação de Deploy ---
       - name: Verify Deployment
@@ -119,11 +126,44 @@ jobs:
           kubectl get svc -n identity-system
           kubectl get ingress -n identity-system
           
-          # Aguardar pods ficarem prontos
-          kubectl wait --for=condition=ready pod -l app=identity-api -n identity-system --timeout=300s
-          kubectl wait --for=condition=ready pod -l app=keycloak -n identity-system --timeout=300s
+          # Aguardar rollout dos deployments completar (mais confiável que wait por pods individuais)
+          echo "Aguardando rollout da Identity API..."
+          kubectl rollout status deployment/identity-api -n identity-system --timeout=300s
           
-          echo "Deploy concluído com sucesso!"
+          echo "Aguardando rollout do Keycloak..."
+          kubectl rollout status deployment/keycloak -n identity-system --timeout=300s
+          
+          # Verificação final do status
+          echo "Status final dos deployments:"
+          kubectl get deployments -n identity-system
+          kubectl get pods -n identity-system
+          
+          # Teste de saúde da aplicação
+          echo "Testando health endpoint..."
+          LOAD_BALANCER=$(kubectl get ingress identity-api-ingress -n identity-system -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          echo "Load Balancer: $LOAD_BALANCER"
+          
+          # Aguardar um pouco para o ingress propagar
+          sleep 30
+          
+          # Testar endpoint de saúde com retry
+          for i in {1..5}; do
+            echo "Tentativa $i/5 - Testando health endpoint..."
+            if curl -f -H "Host: api.fcg-identity.com" "http://$LOAD_BALANCER/identity/health"; then
+              echo "✅ Health check passou!"
+              break
+            else
+              echo "❌ Health check falhou, tentando novamente em 10s..."
+              sleep 10
+            fi
+            
+            if [ $i -eq 5 ]; then
+              echo "❌ Health check falhou após 5 tentativas"
+              exit 1
+            fi
+          done
+          
+          echo "🚀 Deploy concluído com sucesso!"
 
       # --- Rollback em caso de falha ---
       - name: Rollback on failure
