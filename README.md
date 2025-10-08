@@ -126,7 +126,7 @@ flowchart TB
     subgraph "Logging Layer"
         SERILOG[Serilog<br/>Structured Logging]
         CONSOLE[Console Sink<br/>JSON Format]
-        ELASTIC_SINK[Elasticsearch Sink<br/>fcg-logs-{yyyy.MM.dd}]
+        ELASTIC_SINK[Elasticsearch Sink<br/>fcg-logs-daily-index]
     end
     
     subgraph "Metrics & Tracing"
@@ -197,9 +197,9 @@ sequenceDiagram
     
     par Dual Logging Strategy
         Serilog->>+Console: JSON Console Output
-        Console->>K8s: Kubernetes Logs
+        Console->>+K8s: Kubernetes Logs
     and 
-        Serilog->>+Elastic: Ship to Elasticsearch<br/>Index: fcg-logs-{yyyy.MM.dd}
+        Serilog->>+Elastic: Ship to Elasticsearch<br/>Index: fcg-logs-daily-index
     end
     
     API->>+NR: Send Telemetry<br/>(Performance, Errors)
