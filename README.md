@@ -1,440 +1,386 @@
-# 🎮 Tech Challenge - Fase 2
+# 🏗️ Arquitetura Técnica - FCG Identity Microservice
 
-**Plataforma de Venda de Jogos Digitais e Gestão de Transações Financeiras**
-
----
-
-## 📌 Visão Geral
-
-A API desenvolvida oferece uma solução completa para comercialização de jogos digitais, com funcionalidades que abrangem:
-
-- 🔐 **Autenticação e Autorização**: Registro, login, redefinição de senha e confirmação de e-mail  
-- 🕹️ **Gestão de Jogos**: Cadastro completo do catálogo de jogos  
-- 💸 **Promoções**: Criação e gerenciamento de descontos promocionais  
-- 💳 **Transações Financeiras**: Compra, reembolso, depósito e saque de saldo  
-- 📚 **Biblioteca do Usuário**: Armazenamento e gerenciamento dos jogos adquiridos
-
----
-
-## 🧱 Estrutura do Projeto
-
-O projeto segue os princípios de **Domain-Driven Design (DDD)** e utiliza **injeção de dependência** para garantir modularidade, coesão e manutenção facilitada.
-
-### 🔧 Camadas
-
-- **Application** – Camada de orquestração da lógica de aplicação  
-- **Domain** – Regras de negócio e entidades do domínio  
-- **Data** – Implementações de repositórios e acesso a dados  
-- **Infrastructure** – Integrações externas (como serviços de e-mail)  
-- **Shared** – DTOs, modelos base, Requests/Responses e validações  
-- **Tests** – Contém os testes unitários da aplicação
+## 📋 Índice
+- [🏗️ Arquitetura Técnica - FCG Identity Microservice](#️-arquitetura-técnica---fcg-identity-microservice)
+  - [📋 Índice](#-índice)
+  - [🎯 Visão Geral da Arquitetura](#-visão-geral-da-arquitetura)
+  - [🏛️ Arquitetura de Sistema](#️-arquitetura-de-sistema)
+    - [🔧 Componentes Principais](#-componentes-principais)
+  - [📊 Monitoramento e Observabilidade](#-monitoramento-e-observabilidade)
+    - [📈 Observability Stack Completa](#-observability-stack-completa)
+    - [🔍 Log Flow \& Correlation com Elasticsearch](#-log-flow--correlation-com-elasticsearch)
+    - [📊 Elasticsearch Configuration](#-elasticsearch-configuration)
+  - [🔐 Fluxo de Autenticação](#-fluxo-de-autenticação)
+    - [🚪 Processo de Login Completo](#-processo-de-login-completo)
+  - [🛡️ Segurança e Rate Limiting](#️-segurança-e-rate-limiting)
+    - [🚦 Rate Limiting Strategy](#-rate-limiting-strategy)
+  - [⚙️ Especificações Técnicas](#️-especificações-técnicas)
+    - [🏷️ Versões e Dependências](#️-versões-e-dependências)
+    - [📊 Performance Specifications](#-performance-specifications)
 
 ---
 
-## 🔗 Endpoints da API
+## 🎯 Visão Geral da Arquitetura
 
-### 🛡️ Autenticação (`/v1/auth`)
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| GET    | `/` | Listar todos os usuários |
-| GET    | `/{id}` | Obter usuário específico com permissões |
-| PUT    | `/{id}` | Atualizar usuário |
-| DELETE | `/{id}` | Excluir usuário |
-| POST   | `/register` | Registrar nova conta |
-| POST   | `/login` | Login do usuário |
-| POST   | `/refresh-token` | Renovar token JWT |
-| POST   | `/first-access` | Redefinir senha no primeiro acesso |
-| GET    | `/reset-password/{email}` | Enviar link de redefinição de senha |
-| POST   | `/reset-password` | Redefinir senha |
-| GET    | `/confirm-email/{email}` | Enviar link de confirmação de e-mail |
-| POST   | `/confirm-email` | Confirmar e-mail |
+O **FCG Identity Microservice** é um sistema de autenticação e autorização enterprise desenvolvido em **.NET 9** seguindo os princípios de **Clean Architecture** e **Domain-Driven Design (DDD)**. O sistema utiliza **Keycloak** como Identity Provider e está deployado em **AWS EKS** com **Kong Ingress Controller**.
 
-### 🎮 Jogos (`/v1/games`)
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| GET    | `/` | Listar todos os jogos |
-| POST   | `/` | Criar novo jogo |
-| GET    | `/{id}` | Obter jogo por ID |
-| PUT    | `/{id}` | Atualizar jogo |
-| DELETE | `/{id}` | Excluir jogo |
+```mermaid
+graph TB
+    subgraph "Client Layer"
+        WEB[Web Application]
+        MOB[Mobile App]
+        API_CLIENT[API Client]
+    end
 
-### 🏷️ Promoções (`/v1/promotions`)
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| GET    | `/` | Listar promoções ativas |
-| POST   | `/` | Criar nova promoção |
-| GET    | `/{id}` | Obter promoção por ID |
-| PUT    | `/{id}` | Atualizar promoção |
-| DELETE | `/{id}` | Excluir promoção |
-| POST   | `/{promotionId}/promotion-games` | Adicionar jogos à promoção |
-| PUT    | `/promotion-games/{promotionGameId}` | Atualizar item da promoção |
-| DELETE | `/promotion-games/{promotionGameId}` | Remover jogo da promoção |
+    subgraph "API Gateway Layer"
+        ALB[AWS Application Load Balancer]
+        KONG[Kong Ingress Controller]
+    end
 
-### 💰 Transações (`/v1/transactions`)
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| POST   | `/purchase` | Comprar jogo |
-| PUT    | `/refund-purchase` | Solicitar reembolso |
-| POST   | `/deposit` | Depositar saldo |
-| PUT    | `/withdraw` | Sacar saldo |
+    subgraph "Application Layer"
+        IDENTITY[Identity API<br/>.NET 9]
+        KC[Keycloak<br/>Identity Provider]
+    end
 
-### 📚 Biblioteca (`/v1/user-libraries`)
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| GET    | `/{userId}` | Consultar jogos adquiridos |
+    subgraph "Data Layer"
+        KCDB[(Keycloak Database<br/>PostgreSQL)]
+    end
 
----
+    subgraph "Observability Layer"
+        ELK[Elasticsearch<br/>Log Centralization]
+        NR[New Relic APM<br/>Metrics & Tracing]
+    end
 
-## 📦 Modelos de Dados
+    subgraph "Infrastructure Layer"
+        EKS[AWS EKS Cluster]
+        ECR[AWS ECR Registry]
+    end
 
-### 🔐 Autenticação
-- `LoginDto`: E-mail e senha  
-- `CreateUserDto`: Cadastro de usuário com e-mail, permissões e role  
-- `UserDto`: Dados completos do usuário  
-- `ChangePasswordDto`: Redefinição de senha  
-
-### 🎮 Jogos
-- `GameAddRequest`: Nome e preço do jogo  
-- `GameUpdateRequest`: Dados completos do jogo  
-- `GameResponse`: ID, nome, status, preço e datas  
-
-### 🏷️ Promoções
-- `PromotionAddRequest`: Nome, datas e jogos da promoção  
-- `PromotionGameAddRequest`: ID do jogo e percentual de desconto  
-- `PromotionResponse`: Dados da promoção  
-
-### 💳 Transações
-- `PurchaseGameRequest`: ID do usuário, jogo e promoção (opcional)  
-- `BalanceRequest`: ID do usuário e valor  
-- `RefundPurchaseRequest`: ID do usuário e jogo  
-
----
-
-## ⚙️ Recursos Técnicos
-
-- **Linguagem**: C#  
-- **Framework**: ASP.NET Core (.NET 9)  
-- **Arquitetura**: MVC + DDD  
-- **Testes**: TDD  
-- **Autenticação**: JWT com refresh token + Keycloak  
-- **Validação**: Data Annotations, FluentValidation, EF Mapping  
-- **Documentação**: OpenAPI / Swagger 3.0.4  
-- **Serviços**: Serviço de e-mail mockado (por segurança)  
-- **Banco de dados**: PostgreSQL  
-- **Orquestração**: Kubernetes (AWS EKS)  
-- **Gateway**: Kong Ingress Controller  
-- **Identidade**: Keycloak (OpenID Connect)  
-- **Monitoramento**: New Relic APM  
-- **Container Registry**: AWS ECR 
-
----
-
-## ✅ Testes
-
-A aplicação segue os princípios de **Test-Driven Development (TDD)**, com testes unitários que validam regras de negócio, fluxos de uso, exceções e comportamentos esperados.
-
-Utiliza:
-
-- **xUnit**  
-- **Moq**  
-- **FluentAssertions**  
-
----
-
-## 📈 Monitoramento e Observabilidade
-
-### 🏥 Health Checks
-- **`/health`**: Status da API e dependências (banco de dados, Keycloak)
-
-### 📊 New Relic APM
-- **Performance Monitoring**: Métricas de aplicação em tempo real
-- **Error Tracking**: Rastreamento automático de erros e exceções  
-- **Distributed Tracing**: Rastreamento de requests através dos serviços
-- **Dashboard**: Métricas personalizadas de negócio
-
-### 🔍 Kong Ingress Controller Monitoring
-- **Request ID**: Tracking único via `X-Kong-Request-Id`
-- **Correlation ID**: Rastreamento via `X-Correlation-ID` (UUID#counter)
-- **Latency Headers**: `X-Kong-Upstream-Latency`, `X-Kong-Proxy-Latency`
-- **Rate Limiting Headers**: Informações de uso e limites
-
-### 📝 Logging
-- **Structured Logging**: Logs JSON via Serilog
-- **Context Enrichment**: JWT claims (RequestId, UserId, Username, SessionId)
-- **Console Output**: Logs centralizados no Kubernetes
-
----
-
-## 🏗️ Arquitetura Técnica
-
-### ☁️ **AWS EKS Cluster**
-```
-Cluster: fcg-identity (sa-east-1)
-├── Nodes: m7i-flex.large (2 vCPUs, 8GB RAM)
-├── Kubernetes: v1.34 (Amazon Linux)
-└── Storage: EBS gp3 (encrypted)
-```
-
-### 🌐 **Kong Ingress Controller**
-```
-Internet → AWS Load Balancer → Kong Ingress Controller
-                             ├── Identity API (:80)
-                             └── Keycloak (:8080)
-```
-
-**Kong Plugins Ativos:**
-- **Rate Limiting**: 200/min, 2000/hora
-- **CORS**: Origens configuráveis  
-- **Correlation ID**: UUID#counter tracking
-- **Request ID**: Identificação única de requests
-
-### 🔐 **Identity & Auth Flow**
-```
-Client → Kong Ingress → Identity API → Keycloak → PostgreSQL
-       ↓
-   Rate Limiting (200/min)
-   CORS Headers
-   Correlation ID
-   Request Tracking
-```
-
-### 📊 **Observability Stack**
-```
-Application → Serilog → Console Logs → Kubernetes
-            ↓
-         New Relic APM → Dashboards & Alerts
-            ↓
-    Kong Headers → Request Correlation
-```
-
-### 🔄 **CI/CD Pipeline**
-```
-GitHub → Actions → Docker Build → ECR Push → EKS Deploy
-      ↓
-   .NET Tests → Security Scan → Health Check → Production
+    WEB --> ALB
+    MOB --> ALB
+    API_CLIENT --> ALB
+    ALB --> KONG
+    KONG --> IDENTITY
+    KONG --> KC
+    IDENTITY -.-> KC
+    KC --> KCDB
+    IDENTITY --> ELK
+    IDENTITY --> NR
+    KC --> ELK
+    
+    style IDENTITY fill:#e1f5fe
+    style KC fill:#fff3e0
+    style KONG fill:#f3e5f5
+    style EKS fill:#e8f5e8
+    style ELK fill:#00bcd4,color:#fff
 ```
 
 ---
 
-## 🧠 Regras de Negócio
+## 🏛️ Arquitetura de Sistema
 
-### 🔐 Autenticação
-- Senha forte (mín. 8 caracteres, maiúscula, minúscula, número e caractere especial)  
-- Confirmação de e-mail obrigatória  
-- Controle de acesso baseado em roles e claims  
+### 🔧 Componentes Principais
 
-### 💳 Transações
-- Validação de saldo  
-- Prevenção de compras duplicadas  
-- Regras para reembolso  
-- Aplicação automática de promoções válidas  
+```mermaid
+C4Context
+    title System Context Diagram - FCG Identity Microservice
 
-### 🏷️ Promoções
-- Datas válidas (início < fim)  
-- Descontos entre 1% e 100%  
-- Não remover jogos com compras vinculadas  
+    Person(user, "User", "End user accessing the platform")
+    Person(admin, "Administrator", "System administrator")
+    
+    System(identity, "FCG Identity API", ".NET 9 microservice for authentication and user management")
+    System_Ext(keycloak, "Keycloak", "Identity Provider & OpenID Connect server")
+    System_Ext(kong, "Kong Ingress", "API Gateway with rate limiting and CORS")
+    
+    SystemDb(kcdb, "Keycloak Database", "PostgreSQL database storing user data")
+    
+    System_Ext(elasticsearch, "Elasticsearch Cloud", "Centralized logging and search")
+    System_Ext(newrelic, "New Relic", "APM and monitoring platform")
+    System_Ext(github, "GitHub Actions", "CI/CD pipeline")
+    System_Ext(aws, "AWS EKS", "Kubernetes cluster hosting")
 
-### 🎮 Jogos
-- Nome único por jogo  
-
-### 📚 Biblioteca
-- Sem duplicações de jogos para o mesmo usuário  
+    Rel(user, kong, "Makes API requests", "HTTPS")
+    Rel(admin, kong, "Manages users", "HTTPS")
+    Rel(kong, identity, "Routes requests", "HTTP")
+    Rel(kong, keycloak, "Routes auth requests", "HTTP")
+    Rel(identity, keycloak, "Validates tokens & manages users", "HTTP")
+    Rel(keycloak, kcdb, "Stores user data", "SQL")
+    Rel(identity, elasticsearch, "Ships structured logs", "HTTPS")
+    Rel(identity, newrelic, "Sends telemetry", "HTTPS")
+    Rel(github, aws, "Deploys containers", "kubectl")
+```
 
 ---
 
-## 🚀 Como Executar
+## 📊 Monitoramento e Observabilidade
 
-### 🐳 Desenvolvimento Local (Docker)
+### 📈 Observability Stack Completa
 
-Para desenvolvimento local, execute:
+```mermaid
+flowchart TB
+    subgraph "Application Layer"
+        APP[Identity API<br/>.NET 9]
+        KC_APP[Keycloak]
+    end
+    
+    subgraph "Logging Layer"
+        SERILOG[Serilog<br/>Structured Logging]
+        CONSOLE[Console Sink<br/>JSON Format]
+        ELASTIC_SINK[Elasticsearch Sink<br/>fcg-logs-{yyyy.MM.dd}]
+    end
+    
+    subgraph "Metrics & Tracing"
+        NR_AGENT[New Relic Agent]
+        NR_API[New Relic API]
+    end
+    
+    subgraph "Kong Observability"
+        KONG_LOGS[Kong Access Logs]
+        HEADERS[Custom Headers<br/>X-Kong-Request-Id<br/>X-Correlation-ID]
+    end
+    
+    subgraph "Kubernetes Monitoring"
+        K8S_LOGS[Pod Logs]
+        HEALTH_CHECKS[Health Probes<br/>Liveness/Readiness]
+    end
+    
+    subgraph "Log Centralization (GCP)"
+        ELASTICSEARCH[Elasticsearch Cloud<br/>us-central1.gcp.elastic.cloud]
+        ELASTIC_API[Elasticsearch API<br/>API Key Authentication]
+    end
+    
+    subgraph "External Monitoring"
+        NR_DASHBOARD[New Relic Dashboard]
+        ALERTS[Custom Alerts]
+    end
 
-```bash
-docker-compose build --no-cache
-docker-compose up
+    APP --> SERILOG
+    APP --> NR_AGENT
+    KC_APP --> K8S_LOGS
+    SERILOG --> CONSOLE
+    SERILOG --> ELASTIC_SINK
+    ELASTIC_SINK --> ELASTIC_API
+    ELASTIC_API --> ELASTICSEARCH
+    NR_AGENT --> NR_API
+    KONG_LOGS --> HEADERS
+    CONSOLE --> K8S_LOGS
+    K8S_LOGS --> NR_DASHBOARD
+    NR_API --> NR_DASHBOARD
+    NR_DASHBOARD --> ALERTS
+    
+    style APP fill:#1976d2,color:#fff
+    style ELASTICSEARCH fill:#00bcd4,color:#fff
+    style NR_DASHBOARD fill:#4caf50,color:#fff
+    style ALERTS fill:#f44336,color:#fff
 ```
 
-A aplicação estará acessível em:
-- **Identity API**: http://localhost:5001
-- **Swagger**: http://localhost:5001/swagger  
-- **Health Check**: http://localhost:5001/health
-- **Keycloak**: http://localhost:8080
+### 🔍 Log Flow & Correlation com Elasticsearch
 
-### ☁️ Produção (AWS EKS + Kong Ingress Controller)
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Kong
+    participant API as Identity API
+    participant Serilog
+    participant Console as Console Logs
+    participant Elastic as Elasticsearch
+    participant K8s as Kubernetes
+    participant NR as New Relic
 
-O sistema está deployado na AWS com arquitetura otimizada:
-
-```bash
-# Deploy via CI/CD Pipeline (.github/workflows/deploy.yml)
-# Ou deploy manual:
-kubectl apply -f k8s/production/
+    Client->>+Kong: HTTP Request
+    Kong->>Kong: Generate Request ID<br/>X-Kong-Request-Id: uuid
+    Kong->>Kong: Generate Correlation ID<br/>X-Correlation-ID: uuid#counter
+    Kong->>+API: Forward with Headers
+    
+    API->>API: Extract Headers<br/>Set Log Context
+    API->>+Serilog: Log with Context<br/>{RequestId, CorrelationId, UserId}
+    
+    par Dual Logging Strategy
+        Serilog->>+Console: JSON Console Output
+        Console->>K8s: Kubernetes Logs
+    and 
+        Serilog->>+Elastic: Ship to Elasticsearch<br/>Index: fcg-logs-{yyyy.MM.dd}
+    end
+    
+    API->>+NR: Send Telemetry<br/>(Performance, Errors)
+    
+    K8s-->>-NR: Forward Logs<br/>(Optional Log Forwarding)
+    
+    Note over Elastic,NR: Centralized logging & APM monitoring
+    Note over Serilog,NR: Correlation across all services
+    
+    Serilog-->>-API: Log Written
+    API-->>-Kong: Response
+    Kong-->>-Client: Response + Headers<br/>(Request-Id, Latency)
 ```
 
-**🌐 URLs de Produção:**
-- **Identity API**: https://api.fcg-identity.com/identity
-- **Keycloak**: https://keycloak.fcg-identity.com  
-- **Health Check**: https://api.fcg-identity.com/identity/health
-- **Swagger**: https://api.fcg-identity.com/identity/swagger**🔧 Funcionalidades Kong Ingress Controller:**
-- ✅ **Rate Limiting**: 200 requests/minuto, 2000/hora
-- ✅ **CORS**: Configurado para origens permitidas
-- ✅ **Correlation ID**: Tracking automático (X-Correlation-ID)
-- ✅ **Load Balancing**: AWS Application Load Balancer
-- ✅ **SSL/TLS**: Certificados automáticos
+### 📊 Elasticsearch Configuration
 
-**📖 Documentação adicional:**
-- [AWS Setup Guide](AWS_SETUP_GUIDE.md) - Setup completo EKS + Kong Ingress Controller
-- [Kong Migration Guide](KONG_MIGRATION_GUIDE.md) - Migração para Kong Ingress Controller  
-- [Kong Status Final](KONG_STATUS_FINAL.md) - Status atual da implementação Kong
-- [K8s Cleanup Report](K8S_CLEANUP_REPORT.md) - Relatório de limpeza dos arquivos K8s
-- [Keycloak Manual Setup](KEYCLOAK_MANUAL_SETUP.md) - Configuração Keycloak
-
-### 🚀 **Scripts de Deploy**
-- `scripts/remove-kong-gateway.ps1` - Remoção Kong Gateway standalone  
-- `.github/workflows/deploy.yml` - Pipeline CI/CD automatizado
-- `deploy-eks.sh` / `deploy-eks.ps1` - Deploy manual EKS
-
-## Usuários Padrão (Seed)
-
-Após o primeiro build da aplicação, o serviço de Seed criará os seguintes usuários:
-
-### ADMIN
 ```json
 {
-  "email": "vinicius_pinheiro05@hotmail.com",
-  "password": "Default@123"
+  "Serilog": {
+    "Using": [
+      "Serilog.Sinks.Console", 
+      "Serilog.Sinks.Elasticsearch", 
+      "NewRelic.LogEnrichers.Serilog"
+    ],
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "Microsoft": "Warning",
+        "Microsoft.Hosting.Lifetime": "Information",
+        "Microsoft.AspNetCore.Authentication": "Information",
+        "System": "Warning"
+      }
+    },
+    "WriteTo": [
+      {
+        "Name": "Console",
+        "Args": {
+          "outputTemplate": "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception} | RequestId: {RequestId} | CorrelationId: {CorrelationId} | UserId: {UserId} | Username: {Username} | SessionId: {SessionId} | Application: {ApplicationName}"
+        }
+      },
+      {
+        "Name": "Elasticsearch",
+        "Args": {
+          "nodeUris": "https://my-elasticsearch-project-ba9d4e.es.us-central1.gcp.elastic.cloud",
+          "indexFormat": "fcg-logs-{0:yyyy.MM.dd}",
+          "typeName": null,
+          "autoRegisterTemplate": true,
+          "apiKey": "${ELASTICSEARCH_API_KEY}"
+        }
+      }
+    ],
+    "Enrich": [
+      "FromLogContext", 
+      "WithMachineName", 
+      "WithEnvironmentName",
+      "WithNewRelicLogsInContext"
+    ],
+    "Properties": {
+      "ServiceName": "fcg-identity-service",
+      "Application": "FCG Identity API"
+    }
+  }
 }
 ```
 
-### USER
-```json
-{
-  "email": "vinicius_pinheiro02@hotmail.com",
-  "password": "Default@123"
-}
-```
-
-Utilize-os para fazer login e testar as funcionalidades da aplicação.
-
 ---
 
-## 🔐 Autenticação da API
+## 🔐 Fluxo de Autenticação
 
-### 🔑 **Fluxo de Login**
-1. **POST** `https://api.fcg-identity.com/identity/v1/auth/login`
-2. Copie o `accessToken` retornado
-3. Use no header: `Authorization: Bearer {seu_token}`
-4. Renove com `/v1/auth/refresh-token` quando necessário
+### 🚪 Processo de Login Completo
 
-### 📋 **Headers Automáticos Kong**
-Todas as requests incluem automaticamente:
-```http
-X-Kong-Request-Id: uuid-unique-per-request
-X-Correlation-ID: uuid#counter-tracking  
-X-Kong-Upstream-Latency: tempo-ms
-X-Kong-Proxy-Latency: tempo-ms
-```
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Kong as Kong Ingress
+    participant API as Identity API
+    participant KC as Keycloak
+    participant DB as PostgreSQL
+    participant Elastic as Elasticsearch
+    participant NR as New Relic
 
-### ⚡ **Rate Limiting**
-- **200 requests/minuto** por IP
-- **2000 requests/hora** por IP
-- Headers informativos:
-  ```http
-  RateLimit-Limit: 200
-  RateLimit-Remaining: 199
-  X-RateLimit-Limit-Hour: 2000
-  ```
-
-### 🌐 **CORS**
-Configurado para desenvolvimento e produção:
-```http
-Access-Control-Allow-Origin: configurável
-Access-Control-Allow-Credentials: true
-Access-Control-Expose-Headers: X-Auth-Token,X-Correlation-ID
+    Note over Client,NR: User Authentication Flow with Full Observability
+    
+    Client->>+Kong: POST /identity/v1/auth/login<br/>{email, password}
+    Kong->>Kong: Rate Limiting Check<br/>(200/min, 2000/hour)
+    Kong->>Kong: CORS Validation
+    Kong->>Kong: Add Headers<br/>(X-Kong-Request-Id, X-Correlation-ID)
+    Kong->>+API: Forward Request<br/>(Strip /identity prefix)
+    
+    API->>+KC: POST /realms/fiap-cloud-games/protocol/openid-connect/token<br/>grant_type=password
+    KC->>+DB: Validate Credentials
+    DB-->>-KC: User Data
+    KC->>KC: Generate JWT Token<br/>(Access + Refresh)
+    KC-->>-API: TokenResponse<br/>{access_token, refresh_token}
+    
+    API->>API: Map to Response Model
+    
+    par Dual Observability
+        API->>+Elastic: Ship Structured Log<br/>Authentication Success/Failure
+        API->>+NR: Log Authentication Event<br/>Performance Metrics
+    end
+    
+    API-->>-Kong: 200 OK<br/>TokenResponse
+    Kong-->>-Client: Response + Kong Headers<br/>(RateLimit-Remaining, etc.)
+    
+    Note over Elastic,NR: Logs centralized in Elasticsearch + APM in New Relic
 ```
 
 ---
 
-## 🛠️ Troubleshooting
+## 🛡️ Segurança e Rate Limiting
 
-### 🔍 **Verificações Básicas**
-```bash
-# Status do cluster
-kubectl get pods -n identity-system
+### 🚦 Rate Limiting Strategy
 
-# Status dos ingresses
-kubectl get ingress -n identity-system
-
-# Logs da aplicação
-kubectl logs -f deployment/identity-api -n identity-system
-
-# Kong plugins ativos
-kubectl get kongplugin -n identity-system
-```
-
-### ⚠️ **Problemas Comuns**
-
-#### **429 Too Many Requests**
-- Rate limit atingido (200/min ou 2000/hora)
-- Aguarde reset ou verifique headers `RateLimit-Reset`
-
-#### **502 Bad Gateway**
-- Verifique se backend está saudável: `/health`
-- Confirme se Kong Ingress Controller está ativo
-
-#### **CORS Errors**
-- Verifique configuração do plugin `keycloak-cors` ou `identity-cors`
-- Confirme origem permitida nas configurações CORS
-
-#### **SSL/TLS Issues**
-- Verifique se certificados estão válidos
-- Use HTTP para desenvolvimento local
-
-### 📊 **Monitoramento em Tempo Real**
-```bash
-# Kong Request IDs em tempo real
-curl -H "Host: api.fcg-identity.com" https://api.fcg-identity.com/identity/health
-
-# Response headers úteis:
-# X-Kong-Request-Id: tracking único
-# X-Correlation-ID: correlação de requests  
-# RateLimit-Remaining: requests restantes
+```mermaid
+flowchart TD
+    REQUEST[Incoming Request] --> KONG_RL[Kong Rate Limiting Plugin]
+    KONG_RL --> RL_CHECK{Rate Limit Check}
+    
+    RL_CHECK -->|Within Limits| ALLOW[Allow Request]
+    RL_CHECK -->|Exceeded| DENY[HTTP 429<br/>Too Many Requests]
+    
+    ALLOW --> HEADERS[Add Rate Limit Headers<br/>RateLimit-Limit: 200<br/>RateLimit-Remaining: 199<br/>X-RateLimit-Limit-Hour: 2000]
+    
+    subgraph "Rate Limits"
+        PER_MIN[200 requests/minute]
+        PER_HOUR[2000 requests/hour]
+        BY_IP[Rate limited by IP]
+    end
+    
+    subgraph "Observability Integration"
+        LOG_ALLOW[Log Allowed Request<br/>→ Elasticsearch]
+        LOG_DENY[Log Rate Limited Request<br/>→ Elasticsearch + Alert]
+    end
+    
+    HEADERS --> FORWARD[Forward to Backend]
+    FORWARD --> LOG_ALLOW
+    DENY --> LOG_DENY
+    DENY --> RESPONSE[Return Error Response<br/>+ Retry-After header]
+    
+    style DENY fill:#f44336,color:#fff
+    style ALLOW fill:#4caf50,color:#fff
+    style KONG_RL fill:#ff9800,color:#fff
+    style LOG_DENY fill:#ff5722,color:#fff
 ```
 
 ---
 
-## � Status do Projeto
+## ⚙️ Especificações Técnicas
 
-### ✅ **Produção** 
-- **Cluster EKS**: `fcg-identity` (sa-east-1) - ✅ Ativo
-- **Kong Ingress Controller**: ✅ Funcional com plugins 
-- **Identity API**: ✅ Healthy (Rate Limiting: 200/min)
-- **Keycloak**: ✅ Funcional (OpenID Connect)
-- **New Relic**: ✅ Monitoramento ativo
-- **CI/CD Pipeline**: ✅ Deploy automatizado
+### 🏷️ Versões e Dependências
 
-### 🔧 **Funcionalidades Ativas**
-- ✅ Autenticação JWT + Keycloak integration
-- ✅ Rate Limiting (200/min, 2000/hora)  
-- ✅ CORS configurado
-- ✅ Correlation ID tracking
-- ✅ Health checks
-- ✅ Structured logging
-- ✅ Error handling & monitoring
+| Componente | Versão | Descrição |
+|------------|--------|-----------|
+| **.NET** | 9.0 | Framework principal |
+| **ASP.NET Core** | 9.0.9 | Web API framework |
+| **Keycloak** | 22.0 | Identity Provider |
+| **PostgreSQL** | 13-alpine | Database para Keycloak |
+| **Kong Ingress** | Latest | API Gateway |
+| **Kubernetes** | v1.34 | Container orchestration |
+| **AWS EKS** | v1.34 | Managed Kubernetes |
+| **New Relic Agent** | 10.45.0 | APM monitoring |
+| **Serilog** | 9.0.0 | Structured logging |
+| **Elasticsearch** | 8.x | Log centralization (GCP Cloud) |
 
-### 📈 **Métricas Atuais**
-- **Latência Kong Proxy**: ~1ms
-- **Uptime**: 99.9% (monitorado via New Relic)
-- **Requests processadas**: Rate limiting funcional
-- **Recursos**: Otimizado pós-limpeza Kong Gateway
+### 📊 Performance Specifications
 
----
-
-## �👥 Contato
-
-- **Vinicius Freire**
+| Métrica | Valor | Observação |
+|---------|-------|------------|
+| **Response Time** | ~100-200ms (p95) | Incluindo validação Keycloak |
+| **Throughput** | 200 req/min | Rate limit por IP |
+| **Uptime SLA** | 99.9% | Monitorado via New Relic |
+| **Kong Proxy Latency** | ~1ms | Overhead mínimo |
+| **Log Indexing Latency** | <5s | Elasticsearch real-time indexing |
+| **Memory Usage** | <4GB per pod | Otimizado para .NET 9 |
+| **CPU Usage** | <50% average | m7i.flex.large instances |
 
 ---
 
-📄 **Licença**: MIT  
-🧪 **Stack**: .NET 9 + Kong Ingress Controller + AWS EKS + Keycloak + New Relic  
-🏗️ **Arquitetura**: DDD + TDD + Kong Ingress Controller  
-🚀 **Status**: Produção-ready com observabilidade completa
+**Documento Gerado em:** `07/10/2025`  
+**Versão da Aplicação:** `1.0.0`  
+**Ambiente:** `Production (AWS EKS + Elasticsearch Cloud)`  
+**Stack de Observabilidade:** `✅ Elasticsearch + New Relic + Kong`  
+**Status:** `✅ Produção com Observabilidade Completa`
