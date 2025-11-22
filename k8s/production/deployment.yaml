@@ -41,26 +41,6 @@ spec:
             secretKeyRef:
               name: keycloak-client-secrets
               key: api-client-secret
-        # New Relic Configuration
-        - name: NEW_RELIC_LICENSE_KEY
-          valueFrom:
-            secretKeyRef:
-              name: newrelic-secrets
-              key: license-key
-        - name: NEW_RELIC_APP_NAME
-          value: "FCG Identity API"
-        - name: CORECLR_ENABLE_PROFILING
-          value: "1"
-        - name: CORECLR_PROFILER
-          value: "{36032161-FFC0-4B61-B559-F6C5D41BAE5A}"
-        - name: CORECLR_NEWRELIC_HOME
-          value: "/usr/local/newrelic"
-        - name: CORECLR_PROFILER_PATH
-          value: "/usr/local/newrelic/libNewRelicProfiler.so"
-        - name: NEW_RELIC_DISTRIBUTED_TRACING_ENABLED
-          value: "true"
-        - name: NEW_RELIC_LOG_LEVEL
-          value: "info"
         # JWT Configuration
         - name: Jwt__Issuer
           valueFrom:

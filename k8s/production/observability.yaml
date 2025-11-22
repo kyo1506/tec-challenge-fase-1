@@ -1,0 +1,689 @@
+---
+# OpenTelemetry Collector Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector
+  namespace: identity-system
+  labels:
+    app: otel-collector
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: otel-collector
+  template:
+    metadata:
+      labels:
+        app: otel-collector
+    spec:
+      containers:
+      - name: otel-collector
+        image: otel/opentelemetry-collector-contrib:0.112.0
+        ports:
+        - containerPort: 4317
+          name: otlp-grpc
+          protocol: TCP
+        - containerPort: 4318
+          name: otlp-http
+          protocol: TCP
+        - containerPort: 8888
+          name: metrics
+          protocol: TCP
+        - containerPort: 13133
+          name: health-check
+          protocol: TCP
+        volumeMounts:
+        - name: otel-collector-config
+          mountPath: /etc/otel-collector
+          readOnly: true
+        env:
+        - name: GOMEMLIMIT
+          value: "400MiB"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 13133
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 13133
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      volumes:
+      - name: otel-collector-config
+        configMap:
+          name: otel-collector-config
+
+---
+# OpenTelemetry Collector Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-collector-service
+  namespace: identity-system
+  labels:
+    app: otel-collector
+spec:
+  selector:
+    app: otel-collector
+  ports:
+  - name: otlp-grpc
+    port: 4317
+    targetPort: 4317
+    protocol: TCP
+  - name: otlp-http
+    port: 4318
+    targetPort: 4318
+    protocol: TCP
+  - name: metrics
+    port: 8888
+    targetPort: 8888
+    protocol: TCP
+  type: ClusterIP
+
+---
+# OpenTelemetry Collector ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-config
+  namespace: identity-system
+data:
+  config.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+
+    processors:
+      batch:
+        timeout: 10s
+        send_batch_size: 1024
+      
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 400
+      
+      resource:
+        attributes:
+        - key: deployment.environment
+          value: production
+          action: upsert
+        - key: cluster.name
+          value: fcg-eks-cluster
+          action: upsert
+
+      attributes:
+        actions:
+        - key: http.target
+          action: delete
+        - key: http.url
+          action: delete
+
+    exporters:
+      # Export para Prometheus (métricas)
+      prometheusremotewrite:
+        endpoint: http://prometheus-service:9090/api/v1/write
+        tls:
+          insecure: true
+
+      # Export para Tempo (traces)
+      otlp/tempo:
+        endpoint: http://tempo-service:4317
+        tls:
+          insecure: true
+
+      # Export para Loki (logs)
+      loki:
+        endpoint: http://loki-service:3100/loki/api/v1/push
+        tls:
+          insecure: true
+
+      # Logging para debug (opcional)
+      logging:
+        loglevel: info
+
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, batch, resource, attributes]
+          exporters: [otlp/tempo, logging]
+        
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, batch, resource]
+          exporters: [prometheusremotewrite]
+        
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, batch, resource]
+          exporters: [loki]
+
+---
+# Prometheus Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: identity-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+      - name: prometheus
+        image: prom/prometheus:v2.55.1
+        args:
+        - '--config.file=/etc/prometheus/prometheus.yml'
+        - '--storage.tsdb.path=/prometheus'
+        - '--storage.tsdb.retention.time=15d'
+        - '--web.enable-remote-write-receiver'
+        - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+        - '--web.console.templates=/usr/share/prometheus/consoles'
+        ports:
+        - containerPort: 9090
+          name: http
+        volumeMounts:
+        - name: prometheus-config
+          mountPath: /etc/prometheus
+        - name: prometheus-storage
+          mountPath: /prometheus
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: 9090
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9090
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: prometheus-config
+        configMap:
+          name: prometheus-config
+      - name: prometheus-storage
+        persistentVolumeClaim:
+          claimName: prometheus-pvc
+
+---
+# Prometheus Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-service
+  namespace: identity-system
+spec:
+  selector:
+    app: prometheus
+  ports:
+  - name: http
+    port: 9090
+    targetPort: 9090
+  type: ClusterIP
+
+---
+# Prometheus ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: identity-system
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        cluster: 'fcg-eks-cluster'
+        environment: 'production'
+
+    scrape_configs:
+    - job_name: 'prometheus'
+      static_configs:
+      - targets: ['localhost:9090']
+
+    - job_name: 'otel-collector'
+      static_configs:
+      - targets: ['otel-collector-service:8888']
+
+    - job_name: 'keycloak'
+      metrics_path: '/metrics'
+      static_configs:
+      - targets: ['keycloak-service:8080']
+
+---
+# Tempo Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tempo
+  namespace: identity-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tempo
+  template:
+    metadata:
+      labels:
+        app: tempo
+    spec:
+      containers:
+      - name: tempo
+        image: grafana/tempo:2.6.1
+        args:
+        - '-config.file=/etc/tempo/tempo.yaml'
+        ports:
+        - containerPort: 3200
+          name: http
+        - containerPort: 4317
+          name: otlp-grpc
+        - containerPort: 4318
+          name: otlp-http
+        volumeMounts:
+        - name: tempo-config
+          mountPath: /etc/tempo
+        - name: tempo-storage
+          mountPath: /var/tempo
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /ready
+            port: 3200
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3200
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: tempo-config
+        configMap:
+          name: tempo-config
+      - name: tempo-storage
+        persistentVolumeClaim:
+          claimName: tempo-pvc
+
+---
+# Tempo Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: tempo-service
+  namespace: identity-system
+spec:
+  selector:
+    app: tempo
+  ports:
+  - name: http
+    port: 3200
+    targetPort: 3200
+  - name: otlp-grpc
+    port: 4317
+    targetPort: 4317
+  - name: otlp-http
+    port: 4318
+    targetPort: 4318
+  type: ClusterIP
+
+---
+# Tempo ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tempo-config
+  namespace: identity-system
+data:
+  tempo.yaml: |
+    server:
+      http_listen_port: 3200
+
+    distributor:
+      receivers:
+        otlp:
+          protocols:
+            grpc:
+              endpoint: 0.0.0.0:4317
+            http:
+              endpoint: 0.0.0.0:4318
+
+    ingester:
+      max_block_duration: 5m
+
+    compactor:
+      compaction:
+        block_retention: 168h  # 7 days
+
+    storage:
+      trace:
+        backend: local
+        local:
+          path: /var/tempo/traces
+        wal:
+          path: /var/tempo/wal
+
+    querier:
+      frontend_worker:
+        frontend_address: tempo-service:9095
+
+---
+# Loki Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loki
+  namespace: identity-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loki
+  template:
+    metadata:
+      labels:
+        app: loki
+    spec:
+      containers:
+      - name: loki
+        image: grafana/loki:3.2.1
+        args:
+        - '-config.file=/etc/loki/loki.yaml'
+        ports:
+        - containerPort: 3100
+          name: http
+        volumeMounts:
+        - name: loki-config
+          mountPath: /etc/loki
+        - name: loki-storage
+          mountPath: /loki
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /ready
+            port: 3100
+          initialDelaySeconds: 45
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3100
+          initialDelaySeconds: 30
+          periodSeconds: 5
+      volumes:
+      - name: loki-config
+        configMap:
+          name: loki-config
+      - name: loki-storage
+        persistentVolumeClaim:
+          claimName: loki-pvc
+
+---
+# Loki Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki-service
+  namespace: identity-system
+spec:
+  selector:
+    app: loki
+  ports:
+  - name: http
+    port: 3100
+    targetPort: 3100
+  type: ClusterIP
+
+---
+# Loki ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki-config
+  namespace: identity-system
+data:
+  loki.yaml: |
+    auth_enabled: false
+
+    server:
+      http_listen_port: 3100
+
+    common:
+      path_prefix: /loki
+      storage:
+        filesystem:
+          chunks_directory: /loki/chunks
+          rules_directory: /loki/rules
+      replication_factor: 1
+      ring:
+        kvstore:
+          store: inmemory
+
+    schema_config:
+      configs:
+        - from: 2024-01-01
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: index_
+            period: 24h
+
+    limits_config:
+      retention_period: 168h  # 7 days
+      reject_old_samples: true
+      reject_old_samples_max_age: 168h
+
+---
+# Grafana Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: identity-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+      - name: grafana
+        image: grafana/grafana:11.3.1
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: GF_SECURITY_ADMIN_USER
+          value: admin
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grafana-secrets
+              key: admin-password
+        - name: GF_SERVER_ROOT_URL
+          value: "http://grafana-service:3000"
+        - name: GF_INSTALL_PLUGINS
+          value: "grafana-clock-panel,grafana-simple-json-datasource"
+        volumeMounts:
+        - name: grafana-storage
+          mountPath: /var/lib/grafana
+        - name: grafana-datasources
+          mountPath: /etc/grafana/provisioning/datasources
+        - name: grafana-dashboards-config
+          mountPath: /etc/grafana/provisioning/dashboards
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: grafana-storage
+        persistentVolumeClaim:
+          claimName: grafana-pvc
+      - name: grafana-datasources
+        configMap:
+          name: grafana-datasources
+      - name: grafana-dashboards-config
+        configMap:
+          name: grafana-dashboards-config
+
+---
+# Grafana Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-service
+  namespace: identity-system
+spec:
+  selector:
+    app: grafana
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+  type: ClusterIP
+
+---
+# Grafana Datasources ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: identity-system
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+    - name: Prometheus
+      type: prometheus
+      access: proxy
+      url: http://prometheus-service:9090
+      isDefault: true
+      editable: true
+      jsonData:
+        timeInterval: "30s"
+
+    - name: Tempo
+      type: tempo
+      access: proxy
+      url: http://tempo-service:3200
+      editable: true
+      jsonData:
+        tracesToLogsV2:
+          datasourceUid: loki
+          spanStartTimeShift: "-1h"
+          spanEndTimeShift: "1h"
+          filterByTraceID: true
+          filterBySpanID: true
+        tracesToMetrics:
+          datasourceUid: prometheus
+        serviceMap:
+          datasourceUid: prometheus
+        nodeGraph:
+          enabled: true
+
+    - name: Loki
+      type: loki
+      access: proxy
+      url: http://loki-service:3100
+      editable: true
+      jsonData:
+        derivedFields:
+          - datasourceUid: tempo
+            matcherRegex: "trace_id=(\\w+)"
+            name: TraceID
+            url: "$${__value.raw}"
+
+---
+# Grafana Dashboards Config
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-config
+  namespace: identity-system
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+    - name: 'default'
+      orgId: 1
+      folder: 'FCG Identity'
+      type: file
+      disableDeletion: false
+      updateIntervalSeconds: 10
+      allowUiUpdates: true
+      options:
+        path: /var/lib/grafana/dashboards
+
+---
+# Grafana Secrets
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-secrets
+  namespace: identity-system
+type: Opaque
+stringData:
+  admin-password: "fcg-admin-2024"

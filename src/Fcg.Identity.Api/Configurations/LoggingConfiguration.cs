@@ -1,4 +1,3 @@
-using NewRelic.LogEnrichers.Serilog;
 using Serilog;
 using Serilog.Events;
 
@@ -14,11 +13,13 @@ public static class LoggingConfiguration
         Log.Logger = new LoggerConfiguration()
             // Read base configuration from appsettings.json
             .ReadFrom.Configuration(configuration)
-            // Add New Relic enricher for APM correlation
-            .Enrich.WithNewRelicLogsInContext()
-            // Additional custom enrichers
+            // Additional custom enrichers for observability
             .Enrich.WithProperty("ApplicationName", "fcg-identity-api")
             .Enrich.WithProperty("ServiceName", "fcg-identity-api")
+            .Enrich.WithProperty(
+                "Environment",
+                configuration["ASPNETCORE_ENVIRONMENT"] ?? "Production"
+            )
             .CreateLogger();
 
         services.AddLogging(loggingBuilder =>

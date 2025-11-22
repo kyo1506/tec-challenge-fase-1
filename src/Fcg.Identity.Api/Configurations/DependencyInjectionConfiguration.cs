@@ -3,7 +3,6 @@ using Fcg.Identity.Domain.Notifications;
 using Fcg.Identity.Infrastructure.Extensions;
 using Fcg.Identity.Infrastructure.Services;
 using Microsoft.Extensions.Options;
-using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace Fcg.Identity.Api.Configurations;
 
@@ -38,7 +37,5 @@ public static class DependencyInjectionConfiguration
         services.AddExceptionHandler<GlobalExceptionHandler>();
 
         services.AddProblemDetails();
-
-        services.AddTransient<IConfigureOptions<SwaggerGenOptions>, ConfigureSwaggerOptions>();
     }
 }

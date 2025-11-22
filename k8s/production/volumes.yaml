@@ -13,4 +13,64 @@ spec:
       storage: 1Gi
   storageClassName: gp3
 
+---
+# Prometheus PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-pvc
+  namespace: identity-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: gp3
+
+---
+# Tempo PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tempo-pvc
+  namespace: identity-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: gp3
+
+---
+# Loki PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: loki-pvc
+  namespace: identity-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: gp3
+
+---
+# Grafana PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-pvc
+  namespace: identity-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: gp3
+
 

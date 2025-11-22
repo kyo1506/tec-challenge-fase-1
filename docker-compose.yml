@@ -41,11 +41,34 @@ services:
       keycloak-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+
+  # 📊 Observability Stack (All-in-One: Grafana + Loki + Tempo + Prometheus + OTLP Collector)
+  otel-lgtm:
+    image: grafana/otel-lgtm:latest
+    container_name: otel-lgtm
+    ports:
+      - "3000:3000"   # Grafana UI
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+      - "9090:9090"   # Prometheus
+    environment:
+      - OTEL_METRIC_EXPORT_INTERVAL=1000
+      - ENABLE_LOGS_GRAFANA=true
+      - ENABLE_LOGS_TEMPO=true
+      - ENABLE_LOGS_PROMETHEUS=true
+    volumes:
+      - otel_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 60s
+      start_period: 30s
 
   # 🚀 Identity API (Aplicação Principal)
   identity-api:
@@ -57,6 +80,8 @@ services:
       - "5001:80"
     depends_on:
       keycloak:
+        condition: service_healthy
+      otel-lgtm:
         condition: service_healthy
     environment:
       # ASP.NET Core
@@ -77,6 +102,15 @@ services:
       - KeycloakConfiguration__AdminClientSecret=PQ9djJiucWU1VLkzjm2O84nSu5bKnVje
       - KeycloakConfiguration__ApiClientId=fcg-api
       - KeycloakConfiguration__ApiClientSecret=2HUm0LauNhHn5Swn7yS0brWmamRohCYK
+
+      # OpenTelemetry Configuration
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-lgtm:4318
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_SERVICE_NAME=fcg-identity-api
+      - OTEL_RESOURCE_ATTRIBUTES=deployment.environment=development,service.version=1.0.0
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=otlp
+      - OTEL_LOGS_EXPORTER=otlp
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:80/health || exit 1"]
@@ -87,4 +121,6 @@ services:
 
 volumes:
   keycloak_db_data:
+    driver: local
+  otel_data:
     driver: local
