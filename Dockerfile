@@ -2,7 +2,6 @@ ARG DOTNET_VERSION=10.0
 FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION}-alpine AS build
 WORKDIR /src
 
-# Criar HOME e definir DOTNET_CLI_HOME
 ENV HOME=/root
 ENV DOTNET_CLI_HOME=/root/.dotnet
 
@@ -18,14 +17,10 @@ RUN apk add --no-cache icu-libs
 COPY *.sln .
 COPY src/ ./src/
 
-# Agora funciona sem erro
 RUN dotnet restore "Fcg.Identity.sln"
 
 RUN dotnet publish src/Fcg.Identity.Api/Fcg.Identity.Api.csproj -c Release -o /app/publish --no-restore --verbosity diag
 
-# ------------------------------
-# FINAL
-# ------------------------------
 FROM mcr.microsoft.com/dotnet/aspnet:${DOTNET_VERSION}-alpine AS final
 WORKDIR /app
 

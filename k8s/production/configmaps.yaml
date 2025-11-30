@@ -24,8 +24,8 @@ data:
   KeycloakConfiguration__ApiClientId: "fcg-api"
 
   # OpenTelemetry Configuration
-  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector-service:4318"
-  OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector-service:4317"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
   OTEL_SERVICE_NAME: "fcg-identity-api"
   OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=production,service.version=1.0.0"
   OTEL_TRACES_EXPORTER: "otlp"

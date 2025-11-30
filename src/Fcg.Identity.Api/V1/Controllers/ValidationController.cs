@@ -2,7 +2,6 @@ using System.Net;
 using Fcg.Identity.Shared.Constants;
 using Fcg.Identity.Shared.Models.Requests;
 using Fcg.Identity.Shared.Models.Responses;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Fcg.Identity.Api.V1.Controllers;
@@ -260,9 +259,7 @@ public class ValidationController(
                 Permissions.Users.Manage,
                 Permissions.Profile.Manage,
             ],
-            ["manager"] = [Permissions.Users.Read, Permissions.Profile.Manage],
             ["user"] = [Permissions.Profile.Manage],
-            ["customer"] = [Permissions.Profile.Manage],
         };
 
         // Check for exact permission match

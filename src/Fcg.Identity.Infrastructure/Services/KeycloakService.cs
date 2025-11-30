@@ -132,7 +132,12 @@ public class KeycloakService(
 
             if (!response.IsSuccessStatusCode)
             {
-                notifier.Handle(new Notification("Could not fetch the list of users."));
+                var errorContent = await response.Content.ReadAsStringAsync();
+                notifier.Handle(
+                    new Notification(
+                        $"Could not fetch the list of users. Status: {response.StatusCode}, Error: {errorContent}"
+                    )
+                );
                 return null;
             }
 
@@ -140,10 +145,8 @@ public class KeycloakService(
                 List<KeycloakUserResponse>
             >();
             if (usersResponse == null)
-                return Enumerable.Empty<UserResponse>();
+                return [];
 
-            // PERFORMANCE NOTE: This loop creates N+1 requests (1 for users, N for roles).
-            // This is acceptable for a small number of users but can be slow for large user bases.
             var userTasks = usersResponse.Select(async user =>
             {
                 var roles = await GetUserRolesAsync(user.Id);
@@ -284,8 +287,6 @@ public class KeycloakService(
 
     private async Task<List<string>?> GetUserRolesAsync(Guid userId)
     {
-        // This method will already be executed within the ExecuteWithTokenAsync context
-        // so there's no need to call SetAdminTokenAsync again
         var roleMappingsUrl = $"{_config.UsersEndpointPath}/{userId}/role-mappings/realm";
         var rolesResponse = await httpClient.GetAsync(roleMappingsUrl);
         if (!rolesResponse.IsSuccessStatusCode)
@@ -297,7 +298,6 @@ public class KeycloakService(
 
     private async Task<bool> AssignRealmRoleToUserAsync(string userId, List<string> roleNames)
     {
-        // Este método já será executado dentro do contexto do ExecuteWithTokenAsync
         var allRealmRoles = await GetAllRealmRoles();
         var rolesToAssign = allRealmRoles.Where(r => roleNames.Contains(r.Name)).ToList();
 
@@ -313,7 +313,6 @@ public class KeycloakService(
 
     private async Task<bool> RemoveRealmRoleFromUserAsync(Guid userId, List<string> roleNames)
     {
-        // Este método já será executado dentro do contexto do ExecuteWithTokenAsync
         var allRealmRoles = await GetAllRealmRoles();
         var rolesToRemove = allRealmRoles.Where(r => roleNames.Contains(r.Name)).ToList();
 
@@ -333,7 +332,6 @@ public class KeycloakService(
 
     private async Task<List<KeycloakRoleResponse>> GetAllRealmRoles()
     {
-        // Este método já será executado dentro do contexto do ExecuteWithTokenAsync
         var rolesUrl = $"/admin/realms/{_config.TargetRealm}/roles";
         var response = await httpClient.GetAsync(rolesUrl);
         if (!response.IsSuccessStatusCode)
@@ -344,7 +342,6 @@ public class KeycloakService(
 
     private async Task SetAdminTokenAsync()
     {
-        // Verifica se o token ainda é válido (com margem de segurança de 60 segundos)
         if (
             !string.IsNullOrEmpty(_adminAccessToken)
             && _tokenExpiration > DateTime.UtcNow.AddSeconds(60)
@@ -357,7 +354,6 @@ public class KeycloakService(
             return;
         }
 
-        // ✅ RETRY LOGIC MELHORADO
         var maxRetries = 3;
         var baseDelay = TimeSpan.FromSeconds(2);
 
@@ -389,7 +385,6 @@ public class KeycloakService(
 
                 _adminAccessToken = tokenResponse.AccessToken;
 
-                // Use the real token expiration time, with safety margin
                 var expiresInSeconds = tokenResponse.ExpiresIn > 0 ? tokenResponse.ExpiresIn : 3600;
                 _tokenExpiration = DateTime.UtcNow.AddSeconds(expiresInSeconds - 60);
 
@@ -438,11 +433,9 @@ public class KeycloakService(
         catch (HttpRequestException ex)
             when (ex.Message.Contains("401") || ex.Message.Contains("Unauthorized"))
         {
-            // Token may have expired, force renewal
             _adminAccessToken = null;
             _tokenExpiration = DateTime.MinValue;
 
-            // Tenta novamente com novo token
             await SetAdminTokenAsync();
             return await operation();
         }
@@ -452,13 +445,11 @@ public class KeycloakService(
     {
         try
         {
-            // Configurar o token no header da requisição
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
                 "Bearer",
                 token
             );
 
-            // Make request to Keycloak user info endpoint using GET method as per OpenID Connect spec
             var userInfoEndpoint =
                 $"/realms/{_config.TargetRealm}/protocol/openid-connect/userinfo";
 
@@ -476,26 +467,19 @@ public class KeycloakService(
                 return null;
             }
 
-            // Search for complete user information using the ID obtained from the token
             var userId = Guid.Parse(userInfoResponse.Sub);
             var fullUserInfo = await GetUserByIdAsync(userId);
 
-            if (fullUserInfo != null)
-            {
-                // Add token expiration information if available
-                fullUserInfo.ExpiresAt = ExtractTokenExpiration(token);
-            }
+            fullUserInfo?.ExpiresAt = ExtractTokenExpiration(token);
 
             return fullUserInfo;
         }
         catch (Exception)
         {
-            // In case of error, consider token invalid
             return null;
         }
         finally
         {
-            // Remove token from header to not affect other requests
             httpClient.DefaultRequestHeaders.Authorization = null;
         }
     }

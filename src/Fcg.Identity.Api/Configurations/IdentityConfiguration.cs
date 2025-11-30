@@ -26,12 +26,23 @@ public static class IdentityConfig
                 // Em desenvolvimento, podemos desabilitar a verificação de HTTPS
                 options.RequireHttpsMetadata = false;
 
+                // Configuração do MetadataAddress para buscar as chaves públicas
+                options.MetadataAddress =
+                    $"{configuration["Jwt:Authority"]}/.well-known/openid-configuration";
+
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     // Valida se a assinatura do token é confiável
                     ValidateIssuerSigningKey = true,
                     ValidateIssuer = true,
+                    // Aceita múltiplos issuers (localhost e keycloak container)
+                    ValidIssuers = new[]
+                    {
+                        configuration["Jwt:Authority"], // http://keycloak:8080/realms/fiap-cloud-games
+                        configuration["Jwt:Authority"]?.Replace("keycloak:8080", "localhost:8080"), // http://localhost:8080/realms/fiap-cloud-games
+                    },
                     ValidateAudience = true,
+                    ValidAudiences = new[] { configuration["Jwt:Audience"] },
                     ValidateLifetime = true,
                     // Remove a tolerância de tempo (clock skew) para validação da expiração
                     ClockSkew = TimeSpan.Zero,

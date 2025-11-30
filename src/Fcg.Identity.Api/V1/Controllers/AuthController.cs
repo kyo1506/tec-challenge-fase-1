@@ -84,9 +84,14 @@ public class AuthController(
     [HttpGet("users")]
     [Authorize(Policy = "CanManageUsers")]
     [ProducesResponseType(typeof(Root<IEnumerable<UserResponse>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Root<object>), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<Root<IEnumerable<UserResponse>>>> GetAllUsers()
     {
         var users = await keycloakService.GetUsersAsync();
+
+        if (users == null)
+            return CustomResponse<IEnumerable<UserResponse>>(statusCode: HttpStatusCode.BadRequest);
+
         return CustomResponse(users);
     }
 

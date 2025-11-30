@@ -56,7 +56,6 @@ public static class OpenTelemetryConfiguration
                         options.RecordException = true;
                         options.Filter = (httpContext) =>
                         {
-                            // Não rastrear health checks
                             return !httpContext.Request.Path.StartsWithSegments("/health");
                         };
                     })
@@ -64,20 +63,14 @@ public static class OpenTelemetryConfiguration
                     {
                         options.RecordException = true;
                     })
-                    .AddOtlpExporter(options =>
-                    {
-                        options.Endpoint = new Uri(otlpEndpoint);
-                    })
+                    .AddOtlpExporter()
             )
             .WithMetrics(metrics =>
                 metrics
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddRuntimeInstrumentation()
-                    .AddOtlpExporter(options =>
-                    {
-                        options.Endpoint = new Uri(otlpEndpoint);
-                    })
+                    .AddOtlpExporter()
             );
 
         return services;

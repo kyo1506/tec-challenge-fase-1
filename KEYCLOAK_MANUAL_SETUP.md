@@ -36,7 +36,7 @@ Acessar: http://localhost:8080/admin
 ### 3. Configurar Settings do Realm
 
 1. Vá em **Realm Settings**
-2. Na aba **General**:
+2. Na aba **Login**:
    - **User registration**: ✅ Enabled
    - **Edit username**: ✅ Enabled
    - **Forgot password**: ✅ Enabled
@@ -65,11 +65,6 @@ Acessar: http://localhost:8080/admin
 #### Role: user
 - **Role name**: `user`
 - **Description**: `Regular user role for FIAP Cloud Games`
-- Clique em **"Save"**
-
-#### Role: manager (opcional)
-- **Role name**: `manager`
-- **Description**: `Manager role for FIAP Cloud Games`
 - Clique em **"Save"**
 
 ### 5. Criar Client `fcg-api`
@@ -111,23 +106,26 @@ Acessar: http://localhost:8080/admin
 #### Scope: users:manage
 - **Name**: `users:manage`
 - **Description**: `Manage users permission`
-- **Type**: `Optional`
+- **Type**: `Default`
 - **Include in token scope**: ✅ ON
 - Clique em **"Save"**
+- Na aba **Scope**, em **Assign role**, adicione a role **admin**
 
 #### Scope: users:read
 - **Name**: `users:read`
 - **Description**: `Read users permission`
-- **Type**: `Optional`
+- **Type**: `Default`
 - **Include in token scope**: ✅ ON
 - Clique em **"Save"**
+- Na aba **Scope**, em **Assign role**, adicione a role **admin**
 
 #### Scope: profiles:manage
 - **Name**: `profiles:manage`
 - **Description**: `Manage profiles permission`
-- **Type**: `Optional`
+- **Type**: `Default`
 - **Include in token scope**: ✅ ON
 - Clique em **"Save"**
+- Na aba **Scope**, em **Assign role**, adicione as roles **admin** e **user**
 
 ### 8. Associar Scopes ao Client
 
@@ -138,6 +136,8 @@ Acessar: http://localhost:8080/admin
    - `users:manage`
    - `users:read`
    - `profiles:manage`
+
+**Importante:** Com os scopes configurados como Default e com Assign Role definido, os scopes serão automaticamente incluídos no token apenas para usuários que possuem as roles associadas.
 
 ### 9. Configurar Audience Mapper
 
@@ -150,24 +150,45 @@ Acessar: http://localhost:8080/admin
    - **Included Client Audience**: `fcg-api`
    - **Add to ID token**: ❌ OFF
    - **Add to access token**: ✅ ON
-   - **Add to token introspection**: ✅ ON
 6. Clique em **"Save"**
 
 ### 10. Criar Service Account no Master Realm
 
 1. Troque para o realm **Master** (canto superior esquerdo)
 2. Vá em **Clients** → **"Create Client"**
-3. Configure:
+3. **General Settings**:
+   - **Client type**: `OpenID Connect`
    - **Client ID**: `fcg-api-service-account`
-   - **Name**: `FCG Identity API Service Account`
+   - Clique em **"Next"**
+
+4. **Capability config**:
    - **Client authentication**: ✅ ON
-   - **Service accounts roles**: ✅ ON
+   - **Authorization**: ❌ OFF
    - **Standard flow**: ❌ OFF
    - **Direct access grants**: ❌ OFF
+   - **Service accounts roles**: ✅ ON
+   - Clique em **"Next"**
 
-4. Em **Credentials**, anotar o **Client Secret**
+5. **Login settings**:
+   - Deixe todos os campos em branco
+   - Clique em **"Save"**
 
-### 11. Criar Usuário de Teste (Opcional)
+6. Na aba **Credentials**, anotar o **Client Secret**
+
+7. **Configurar Permissões do Service Account**:
+   - Vá na aba **Service account roles**
+   - Clique em **"Assign role"**
+   - No filtro, clique em **"Filter by realm roles"** e mude para **"Filter by clients"**
+   - Busque por **"realm-management"**
+   - Selecione as seguintes roles:
+     - `manage-users` (gerenciar usuários)
+     - `view-users` (visualizar usuários)
+     - `query-users` (consultar usuários)
+   - Clique em **"Assign"**
+
+### 11. Criar Usuários de Teste (Opcional)
+
+#### Usuário Regular (user role)
 
 1. Volte para o realm **fiap-cloud-games**
 2. Vá em **Users** → **"Add user"**
@@ -190,6 +211,28 @@ Acessar: http://localhost:8080/admin
    - Selecionar **"user"**
    - Clique em **"Assign"**
 
+#### Usuário Admin (admin role)
+
+1. Vá em **Users** → **"Add user"**
+2. Configure:
+   - **Username**: `adminuser`
+   - **Email**: `admin@fiap.com.br`
+   - **First name**: `Admin`
+   - **Last name**: `User`
+   - **Email verified**: ✅ ON
+   - **Enabled**: ✅ ON
+
+3. Clique em **"Create"**
+4. Na aba **Credentials**:
+   - **Password**: `Admin@123`
+   - **Temporary**: ❌ OFF
+   - Clique em **"Set password"**
+
+5. Na aba **Role mapping**:
+   - Clique em **"Assign role"**
+   - Selecionar **"admin"**
+   - Clique em **"Assign"**
+
 ## 🧪 Testando a Configuração
 
 ### 1. Obter Token via Client Credentials
@@ -200,20 +243,50 @@ curl -X POST "http://localhost:8080/realms/fiap-cloud-games/protocol/openid-conn
   -d "grant_type=client_credentials&client_id=fcg-api&client_secret=txCC3nj6snXNYWsIVPNJV2zeeoTyMSBO"
 ```
 
-### 2. Obter Token via Password Grant (usuário)
+### 2. Obter Token via Password Grant (usuário regular)
 
 ```bash
+# Usuário com role 'user' - receberá apenas o scope profiles:manage
 curl -X POST "http://localhost:8080/realms/fiap-cloud-games/protocol/openid-connect/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=password&client_id=fcg-api&client_secret=txCC3nj6snXNYWsIVPNJV2zeeoTyMSBO&username=testuser&password=Test@123&scope=openid profile users:read"
+  -d "grant_type=password&client_id=fcg-api&client_secret=txCC3nj6snXNYWsIVPNJV2zeeoTyMSBO&username=testuser&password=Test@123&scope=openid profile profiles:manage"
 ```
 
-### 3. Validar Token
+### 3. Obter Token via Password Grant (usuário admin)
+
+```bash
+# Usuário com role 'admin' - receberá users:manage, users:read e profiles:manage
+curl -X POST "http://localhost:8080/realms/fiap-cloud-games/protocol/openid-connect/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=password&client_id=fcg-api&client_secret=txCC3nj6snXNYWsIVPNJV2zeeoTyMSBO&username=adminuser&password=Admin@123&scope=openid profile users:manage users:read profiles:manage"
+```
+
+### 4. Validar Token
 
 ```bash
 curl -X POST "http://localhost:8080/realms/fiap-cloud-games/protocol/openid-connect/token/introspect" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "token=SEU_ACCESS_TOKEN&client_id=fcg-api&client_secret=txCC3nj6snXNYWsIVPNJV2zeeoTyMSBO"
+```
+
+**Exemplo de resposta para usuário 'user':**
+```json
+{
+  "scope": "openid profile profiles:manage",
+  "realm_access": {
+    "roles": ["user"]
+  }
+}
+```
+
+**Exemplo de resposta para usuário 'admin':**
+```json
+{
+  "scope": "openid profile users:manage users:read profiles:manage",
+  "realm_access": {
+    "roles": ["admin"]
+  }
+}
 ```
 
 ## 📝 Credenciais Importantes
@@ -233,9 +306,14 @@ CLIENT_SECRET: txCC3nj6snXNYWsIVPNJV2zeeoTyMSBO
 SERVICE_ACCOUNT_CLIENT_ID: fcg-api-service-account  
 SERVICE_ACCOUNT_CLIENT_SECRET: MtgWaDXicoDcGpIQzIYUf2ulMQT1nkrV
 
-# Test User
-USERNAME: testuser
-PASSWORD: Test@123
+# Test Users
+USER_USERNAME: testuser
+USER_PASSWORD: Test@123
+USER_SCOPES: profiles:manage
+
+ADMIN_USERNAME: adminuser
+ADMIN_PASSWORD: Admin@123
+ADMIN_SCOPES: users:manage, users:read, profiles:manage
 ```
 
 ## 🔧 Integração com a API
@@ -258,12 +336,16 @@ Após a configuração, atualize as configurações da sua API Identity:
 - [ ] Realm `fiap-cloud-games` criado
 - [ ] Roles `admin`, `user` criadas
 - [ ] Client `fcg-api` configurado com secret
-- [ ] Client scopes `users:manage`, `users:read`, `profiles:manage` criados
+- [ ] Client scopes `users:manage`, `users:read`, `profiles:manage` criados como Default
+- [ ] Roles associadas aos scopes via "Assign role" (admin para users:manage/users:read, admin+user para profiles:manage)
 - [ ] Audience mapper configurado
 - [ ] Service account no master realm criado
-- [ ] Usuário de teste criado (opcional)
-- [ ] Tokens sendo gerados com sucesso
+- [ ] Service account com permissões `manage-users`, `view-users`, `query-users` do realm-management
+- [ ] Usuários de teste criados (opcional)
+- [ ] Token do usuário 'user' contém apenas `profiles:manage`
+- [ ] Token do usuário 'admin' contém `users:manage`, `users:read` e `profiles:manage`
 - [ ] API consegue validar tokens
+- [ ] Endpoint `/v1/users` funciona corretamente para admin
 
 ## 🚨 Troubleshooting
 
@@ -278,8 +360,17 @@ Após a configuração, atualize as configurações da sua API Identity:
 
 ### Erro de scope
 - Verificar se os client scopes foram criados
-- Conferir se foram associados ao client como "Optional"
+- Conferir se foram associados ao client como "Default"
+- Validar se as roles estão associadas aos scopes via "Assign role"
 - Validar se estão sendo solicitados na requisição de token
+
+### Erro 403 Forbidden ao buscar usuários
+- Verificar se o service account tem as roles necessárias
+- No realm Master, verificar se o client `fcg-api-service-account` tem as roles:
+  - `manage-users` (do realm-management)
+  - `view-users` (do realm-management)
+  - `query-users` (do realm-management)
+- Essas roles devem estar em **Service account roles** do client
 
 ---
 

@@ -16,7 +16,6 @@ public static class DependencyInjectionConfiguration
 
         services.AddScoped<IUser, AspNetUser>();
 
-        // Configura o serviço e o HttpClient para interagir com o Keycloak
         services.Configure<KeycloakConfiguration>(
             services
                 .BuildServiceProvider()

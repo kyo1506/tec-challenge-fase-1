@@ -47,28 +47,61 @@ services:
       retries: 10
       start_period: 90s
 
-  # 📊 Observability Stack (All-in-One: Grafana + Loki + Tempo + Prometheus + OTLP Collector)
-  otel-lgtm:
-    image: grafana/otel-lgtm:latest
-    container_name: otel-lgtm
+  # 📊 Observability Stack
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
     ports:
-      - "3000:3000"   # Grafana UI
-      - "4317:4317"   # OTLP gRPC receiver
-      - "4318:4318"   # OTLP HTTP receiver
-      - "9090:9090"   # Prometheus
-    environment:
-      - OTEL_METRIC_EXPORT_INTERVAL=1000
-      - ENABLE_LOGS_GRAFANA=true
-      - ENABLE_LOGS_TEMPO=true
-      - ENABLE_LOGS_PROMETHEUS=true
+      - "9090:9090"
     volumes:
-      - otel_data:/data
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    ports:
+      - "3100:3100"
+
+  tempo:
+    image: grafana/tempo:latest
+    container_name: tempo
+    command: [ "-config.file=/etc/tempo-config.yml" ]
+    volumes:
+      - ./observability/tempo-config.yml:/etc/tempo-config.yml
+    ports:
+      - "3200:3200" # Tempo UI
+      - "4317"      # OTLP gRPC
+
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    container_name: otel-collector
+    command: [ "--config=/etc/otel-collector-config.yml" ]
+    volumes:
+      - ./observability/otel-collector-config.yml:/etc/otel-collector-config.yml
+    ports:
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "8889:8889" # Prometheus exporter
+    depends_on:
+      - loki
+      - tempo
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./observability/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
 
   # 🚀 Identity API (Aplicação Principal)
   identity-api:
@@ -81,8 +114,8 @@ services:
     depends_on:
       keycloak:
         condition: service_healthy
-      otel-lgtm:
-        condition: service_healthy
+      otel-collector:
+        condition: service_started
     environment:
       # ASP.NET Core
       - ASPNETCORE_ENVIRONMENT=Development
@@ -99,13 +132,13 @@ services:
       - KeycloakConfiguration__TargetRealm=fiap-cloud-games
       - KeycloakConfiguration__Audience=http://keycloak:8080
       - KeycloakConfiguration__AdminClientId=fcg-api-service-account
-      - KeycloakConfiguration__AdminClientSecret=PQ9djJiucWU1VLkzjm2O84nSu5bKnVje
+      - KeycloakConfiguration__AdminClientSecret=7LF1zdJRb0KppOY2LNrmokWZvnvH0nXX
       - KeycloakConfiguration__ApiClientId=fcg-api
-      - KeycloakConfiguration__ApiClientSecret=2HUm0LauNhHn5Swn7yS0brWmamRohCYK
+      - KeycloakConfiguration__ApiClientSecret=mev3cV6wKPvu42AItT1dDWhxjHGKHhJe
 
       # OpenTelemetry Configuration
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-lgtm:4318
-      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
       - OTEL_SERVICE_NAME=fcg-identity-api
       - OTEL_RESOURCE_ATTRIBUTES=deployment.environment=development,service.version=1.0.0
       - OTEL_TRACES_EXPORTER=otlp
@@ -121,6 +154,4 @@ services:
 
 volumes:
   keycloak_db_data:
-    driver: local
-  otel_data:
     driver: local
