@@ -18,7 +18,7 @@ public static class ScalarConfig
             {
                 options
                     .WithTitle("FCG Identity Service API")
-                    .WithTheme(ScalarTheme.DeepSpace)
+                    .WithTheme(ScalarTheme.BluePlanet)
                     .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient);
             });
         }

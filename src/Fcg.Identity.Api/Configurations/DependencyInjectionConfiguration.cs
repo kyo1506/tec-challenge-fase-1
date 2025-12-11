@@ -23,15 +23,26 @@ public static class DependencyInjectionConfiguration
                 .GetSection(nameof(KeycloakConfiguration))
         );
 
-        services.AddHttpClient<IKeycloakService, KeycloakService>(
-            (serviceProvider, client) =>
-            {
-                var config = serviceProvider
-                    .GetRequiredService<IOptions<KeycloakConfiguration>>()
-                    .Value;
-                client.BaseAddress = new Uri(config.BaseUrl);
-            }
-        );
+        services
+            .AddHttpClient<IKeycloakService, KeycloakService>(
+                (serviceProvider, client) =>
+                {
+                    var config = serviceProvider
+                        .GetRequiredService<IOptions<KeycloakConfiguration>>()
+                        .Value;
+                    client.BaseAddress = new Uri(config.BaseUrl);
+                    client.Timeout = TimeSpan.FromSeconds(60);
+                }
+            )
+            .AddPolicyHandler(
+                (serviceProvider, request) =>
+                {
+                    var logger = serviceProvider
+                        .GetRequiredService<ILoggerFactory>()
+                        .CreateLogger("Polly.Resilience");
+                    return ResilienceConfiguration.GetCombinedPolicy(logger);
+                }
+            );
 
         services.AddExceptionHandler<GlobalExceptionHandler>();
 

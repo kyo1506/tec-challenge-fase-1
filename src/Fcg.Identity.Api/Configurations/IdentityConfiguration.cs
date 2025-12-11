@@ -36,13 +36,13 @@ public static class IdentityConfig
                     ValidateIssuerSigningKey = true,
                     ValidateIssuer = true,
                     // Aceita múltiplos issuers (localhost e keycloak container)
-                    ValidIssuers = new[]
-                    {
+                    ValidIssuers =
+                    [
                         configuration["Jwt:Authority"], // http://keycloak:8080/realms/fiap-cloud-games
                         configuration["Jwt:Authority"]?.Replace("keycloak:8080", "localhost:8080"), // http://localhost:8080/realms/fiap-cloud-games
-                    },
+                    ],
                     ValidateAudience = true,
-                    ValidAudiences = new[] { configuration["Jwt:Audience"] },
+                    ValidAudiences = [configuration["Jwt:Audience"]],
                     ValidateLifetime = true,
                     // Remove a tolerância de tempo (clock skew) para validação da expiração
                     ClockSkew = TimeSpan.Zero,

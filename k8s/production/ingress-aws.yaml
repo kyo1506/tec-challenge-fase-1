@@ -146,5 +146,6 @@ metadata:
 plugin: correlation-id
 config:
   header_name: X-Correlation-ID
-  generator: uuid#counter
+  generator: uuid
   echo_downstream: true
+  preserve_existing: true
