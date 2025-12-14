@@ -1,5 +1,5 @@
 ---
-# Keycloak Database
+# Keycloak Database with Postgres Exporter
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -14,12 +14,18 @@ spec:
     metadata:
       labels:
         app: keycloak-db
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9187"
+        prometheus.io/path: "/metrics"
     spec:
       containers:
+      # PostgreSQL Database
       - name: postgres
         image: postgres:13-alpine
         ports:
         - containerPort: 5432
+          name: postgres
         env:
         - name: PGDATA
           value: "/var/lib/postgresql/data/pgdata"
@@ -45,6 +51,27 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
+      
+      # Postgres Exporter (métricas para Prometheus)
+      - name: postgres-exporter
+        image: prometheuscommunity/postgres-exporter:latest
+        ports:
+        - containerPort: 9187
+          name: metrics
+        env:
+        - name: DATA_SOURCE_NAME
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: postgres-exporter-dsn
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+      
       volumes:
       - name: keycloak-db-storage
         persistentVolumeClaim:

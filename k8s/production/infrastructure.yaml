@@ -1,5 +1,5 @@
 ---
-# Keycloak Deployment
+# Keycloak Deployment with Prometheus Metrics
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -14,6 +14,10 @@ spec:
     metadata:
       labels:
         app: keycloak
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
     spec:
       containers:
       - name: keycloak

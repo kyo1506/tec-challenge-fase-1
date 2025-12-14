@@ -268,18 +268,69 @@ data:
         environment: 'production'
 
     scrape_configs:
+    # Prometheus self-monitoring
     - job_name: 'prometheus'
       static_configs:
       - targets: ['localhost:9090']
 
+    # OpenTelemetry Collector (recebe métricas da aplicação .NET)
     - job_name: 'otel-collector'
       static_configs:
       - targets: ['otel-collector-service:8888']
+      relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'otel-collector'
 
+    # Keycloak metrics endpoint
     - job_name: 'keycloak'
       metrics_path: '/metrics'
       static_configs:
       - targets: ['keycloak-service:8080']
+      relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'keycloak'
+
+    # PostgreSQL Exporter (métricas do banco de dados)
+    - job_name: 'postgres'
+      static_configs:
+      - targets: ['keycloak-db-service:9187']
+      relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'keycloak-db'
+
+    # Service discovery automático (pods com annotations)
+    - job_name: 'kubernetes-pods'
+      kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+          - identity-system
+      relabel_configs:
+      # Apenas pods com annotation prometheus.io/scrape=true
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      # Usar a porta definida na annotation
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        target_label: __address__
+        regex: (.+)
+        replacement: __meta_kubernetes_pod_ip:$1
+      # Usar o path definido na annotation
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      # Labels úteis
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: kubernetes_namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: kubernetes_pod_name
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        target_label: app
 
 ---
 # Tempo Deployment
