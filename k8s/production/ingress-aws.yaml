@@ -148,4 +148,3 @@ config:
   header_name: X-Correlation-ID
   generator: uuid
   echo_downstream: true
-  preserve_existing: true
