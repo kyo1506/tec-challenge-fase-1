@@ -9,7 +9,7 @@ on:
 
 env:
   ECR_REPOSITORY: fcg-identity-api
-  EKS_CLUSTER_NAME: fcg-identity
+  EKS_CLUSTER_NAME: fcg-identity-cluster
   AWS_REGION: sa-east-1
 
 jobs:
@@ -24,7 +24,7 @@ jobs:
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: "10.0.x"
 
       - name: Restore dependencies
         run: dotnet restore Fcg.Identity.sln
@@ -65,11 +65,11 @@ jobs:
           echo "Building Docker image..."
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          
+
           echo "Pushing to ECR..."
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          
+
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
       # --- Kubernetes Deploy ---
@@ -87,13 +87,13 @@ jobs:
       - name: Deploy to EKS
         run: |
           echo "Imagem a ser deployada: ${{ steps.build-image.outputs.image }}"
-          
+
           # Substituir placeholder da imagem
           sed -i 's|208452488125.dkr.ecr.sa-east-1.amazonaws.com/fcg-identity-api:latest|${{ steps.build-image.outputs.image }}|g' k8s/production/deployment.yaml
-          
+
           echo "Verificando substituição da imagem:"
           grep "image:" k8s/production/deployment.yaml
-          
+
           # Aplicar manifestos na ordem correta
           kubectl apply -f k8s/production/namespace.yaml
           kubectl apply -f k8s/production/secrets.yaml
@@ -102,20 +102,20 @@ jobs:
           kubectl apply -f k8s/production/databases.yaml
           kubectl apply -f k8s/production/services.yaml
           kubectl apply -f k8s/production/infrastructure.yaml
-          
+
           # Aguardar banco de dados estar pronto
           echo "Aguardando banco de dados ficar pronto..."
           kubectl wait --for=condition=ready pod -l app=keycloak-db -n identity-system --timeout=300s
-          
+
           # Deploy da aplicação (isso vai triggerar rolling update)
           echo "Aplicando deployment da Identity API..."
           kubectl apply -f k8s/production/deployment.yaml
-          
+
           # Aplicar configurações do Kong Ingress Controller
           echo "Aplicando configurações do ingress..."
           kubectl apply -f k8s/production/ingress-aws.yaml
           kubectl apply -f k8s/production/resource-configs.yaml
-          
+
           echo "Manifestos aplicados. Aguardando rollout na próxima etapa..."
 
       # --- Verificação de Deploy ---
@@ -125,27 +125,27 @@ jobs:
           kubectl get pods -n identity-system
           kubectl get svc -n identity-system
           kubectl get ingress -n identity-system
-          
+
           # Aguardar rollout dos deployments completar (mais confiável que wait por pods individuais)
           echo "Aguardando rollout da Identity API..."
           kubectl rollout status deployment/identity-api -n identity-system --timeout=300s
-          
+
           echo "Aguardando rollout do Keycloak..."
           kubectl rollout status deployment/keycloak -n identity-system --timeout=300s
-          
+
           # Verificação final do status
           echo "Status final dos deployments:"
           kubectl get deployments -n identity-system
           kubectl get pods -n identity-system
-          
+
           # Teste de saúde da aplicação
           echo "Testando health endpoint..."
           LOAD_BALANCER=$(kubectl get ingress identity-api-ingress -n identity-system -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
           echo "Load Balancer: $LOAD_BALANCER"
-          
+
           # Aguardar um pouco para o ingress propagar
           sleep 30
-          
+
           # Testar endpoint de saúde com retry
           for i in {1..5}; do
             echo "Tentativa $i/5 - Testando health endpoint..."
@@ -162,7 +162,7 @@ jobs:
               exit 1
             fi
           done
-          
+
           echo "🚀 Deploy concluído com sucesso!"
 
       # --- Rollback em caso de falha ---
@@ -170,7 +170,7 @@ jobs:
         if: failure()
         run: |
           echo "Deploy falhou. Executando rollback..."
-          
+
           # Verificar se kubectl está conectado
           if kubectl cluster-info &> /dev/null; then
             echo "Conexão com Kubernetes OK, executando rollback..."
