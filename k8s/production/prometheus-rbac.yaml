@@ -1,0 +1,63 @@
+---
+# ServiceAccount for Prometheus
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: identity-system
+
+---
+# ClusterRole with permissions to discover and scrape metrics across all namespaces
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus-reader
+rules:
+# Permite listar e assistir pods, services, endpoints em todos os namespaces
+- apiGroups: [""]
+  resources:
+  - nodes
+  - nodes/metrics
+  - services
+  - endpoints
+  - pods
+  verbs: ["get", "list", "watch"]
+
+# Permite acessar métricas de nós
+- apiGroups: [""]
+  resources:
+  - nodes/proxy
+  verbs: ["get"]
+
+# Permite listar e assistir recursos de rede
+- apiGroups: ["networking.k8s.io"]
+  resources:
+  - ingresses
+  verbs: ["get", "list", "watch"]
+
+# Permite acessar ConfigMaps (para service discovery)
+- apiGroups: [""]
+  resources:
+  - configmaps
+  verbs: ["get"]
+
+# Permite acessar métricas do API server
+- nonResourceURLs:
+  - /metrics
+  - /metrics/cadvisor
+  verbs: ["get"]
+
+---
+# ClusterRoleBinding para aplicar as permissões ao ServiceAccount
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus-reader
+subjects:
+- kind: ServiceAccount
+  name: prometheus
+  namespace: identity-system

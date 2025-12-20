@@ -197,6 +197,7 @@ spec:
       labels:
         app: prometheus
     spec:
+      serviceAccountName: prometheus
       securityContext:
         fsGroup: 65534
       initContainers:
@@ -319,25 +320,22 @@ data:
         target_label: instance
         replacement: 'keycloak-db'
 
-    # Service discovery automático (pods com annotations)
+    # Service discovery automático em TODOS os namespaces (pods com annotations)
     - job_name: 'kubernetes-pods'
       kubernetes_sd_configs:
       - role: pod
-        namespaces:
-          names:
-          - identity-system
       relabel_configs:
       # Apenas pods com annotation prometheus.io/scrape=true
       - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
         action: keep
         regex: true
       # Usar a porta definida na annotation
-      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
         action: replace
         target_label: __address__
-        regex: (.+)
-        replacement: __meta_kubernetes_pod_ip:$1
-      # Usar o path definido na annotation
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+      # Usar o path definido na annotation (padrão /metrics)
       - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
         action: replace
         target_label: __metrics_path__
@@ -349,6 +347,104 @@ data:
         target_label: kubernetes_pod_name
       - source_labels: [__meta_kubernetes_pod_label_app]
         target_label: app
+      - source_labels: [__meta_kubernetes_pod_node_name]
+        target_label: kubernetes_node
+
+    # Service discovery para Services em todos os namespaces
+    - job_name: 'kubernetes-services'
+      kubernetes_sd_configs:
+      - role: service
+      relabel_configs:
+      # Apenas services com annotation prometheus.io/scrape=true
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      # Usar a porta definida na annotation
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_port]
+        action: replace
+        target_label: __address__
+        regex: (.+)
+        replacement: __meta_kubernetes_service_name:$1
+      # Usar o path definido na annotation
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      # Labels úteis
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: kubernetes_namespace
+      - source_labels: [__meta_kubernetes_service_name]
+        target_label: kubernetes_service_name
+      - source_labels: [__meta_kubernetes_service_label_app]
+        target_label: app
+
+    # PostgreSQL Exporters em todos os namespaces
+    - job_name: 'postgres-exporters'
+      kubernetes_sd_configs:
+      - role: pod
+      relabel_configs:
+      # Filtra apenas pods com label app=postgres-exporter ou similar
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        action: keep
+        regex: (postgres.*exporter|postgresql.*exporter)
+      # Usa porta 9187 (porta padrão do postgres_exporter)
+      - source_labels: [__address__]
+        action: replace
+        target_label: __address__
+        regex: ([^:]+)(?::\d+)?
+        replacement: $1:9187
+      # Labels
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: kubernetes_namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: kubernetes_pod_name
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        target_label: app
+      - action: replace
+        target_label: job
+        replacement: postgres
+
+    # MySQL/MariaDB Exporters em todos os namespaces
+    - job_name: 'mysql-exporters'
+      kubernetes_sd_configs:
+      - role: pod
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        action: keep
+        regex: (mysql.*exporter|mariadb.*exporter)
+      - source_labels: [__address__]
+        action: replace
+        target_label: __address__
+        regex: ([^:]+)(?::\d+)?
+        replacement: $1:9104
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: kubernetes_namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: kubernetes_pod_name
+      - action: replace
+        target_label: job
+        replacement: mysql
+
+    # MongoDB Exporters em todos os namespaces
+    - job_name: 'mongodb-exporters'
+      kubernetes_sd_configs:
+      - role: pod
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        action: keep
+        regex: (mongodb.*exporter)
+      - source_labels: [__address__]
+        action: replace
+        target_label: __address__
+        regex: ([^:]+)(?::\d+)?
+        replacement: $1:9216
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: kubernetes_namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: kubernetes_pod_name
+      - action: replace
+        target_label: job
+        replacement: mongodb
 
 ---
 # Tempo Deployment
