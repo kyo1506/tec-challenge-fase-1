@@ -11,8 +11,10 @@ metadata:
   annotations:
     # Kong strip-path: false - mantém o path original para Keycloak
     konghq.com/strip-path: "false"
+    # Preserve host header
+    konghq.com/preserve-host: "true"
     # Kong plugins para Keycloak
-    konghq.com/plugins: keycloak-cors
+    konghq.com/plugins: keycloak-cors,keycloak-request-transformer
 spec:
   ingressClassName: kong
   rules:
@@ -148,3 +150,18 @@ config:
   header_name: X-Correlation-ID
   generator: uuid
   echo_downstream: true
+
+---
+# Request Transformer para Keycloak (garantir headers X-Forwarded)
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: keycloak-request-transformer
+  namespace: identity-system
+plugin: request-transformer
+config:
+  add:
+    headers:
+      - "X-Forwarded-Proto:http"
+      - "X-Forwarded-Host:keycloak.fcg-identity.com"
+      - "X-Forwarded-Port:80"

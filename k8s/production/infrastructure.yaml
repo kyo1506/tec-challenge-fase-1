@@ -28,8 +28,8 @@ spec:
                "--hostname-strict-https=false",
                "--http-enabled=true", 
                "--proxy=edge",
-               "--hostname-url=http://keycloak-service:8080",
-               "--hostname-admin-url=http://keycloak-service:8080"]
+               "--hostname=keycloak.fcg-identity.com",
+               "--hostname-port=80"]
         ports:
         - containerPort: 8080
           name: http
@@ -44,6 +44,8 @@ spec:
               key: keycloak-db-password
         - name: KC_DB_URL
           value: "jdbc:postgresql://keycloak-db-service:5432/keycloak"
+        - name: PROXY_ADDRESS_FORWARDING
+          value: "true"
         resources:
           requests:
             memory: "512Mi"
