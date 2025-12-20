@@ -20,6 +20,8 @@ spec:
       containers:
       - name: otel-collector
         image: otel/opentelemetry-collector-contrib:0.112.0
+        args:
+        - "--config=/etc/otel-collector/config.yaml"
         ports:
         - containerPort: 4317
           name: otlp-grpc
@@ -140,27 +142,25 @@ data:
           action: delete
 
     exporters:
-      # Export para Prometheus (métricas)
-      prometheusremotewrite:
-        endpoint: http://prometheus-service:9090/api/v1/write
-        tls:
-          insecure: true
-
-      # Export para Tempo (traces)
+      # Export para Tempo (traces) via OTLP gRPC
       otlp/tempo:
-        endpoint: http://tempo-service:4317
+        endpoint: tempo-service:4317
         tls:
           insecure: true
-
-      # Export para Loki (logs)
-      loki:
-        endpoint: http://loki-service:3100/loki/api/v1/push
+      
+      # Export para Loki (logs) via OTLP HTTP
+      otlphttp:
+        logs_endpoint: http://loki-service:3100/otlp/v1/logs
         tls:
           insecure: true
+      
+      # Prometheus exporter (HTTP endpoint)
+      prometheus:
+        endpoint: 0.0.0.0:8889
 
-      # Logging para debug (opcional)
-      logging:
-        loglevel: info
+      # Debug exporter (substituiu logging)
+      debug:
+        verbosity: detailed
 
     service:
       extensions: [health_check, pprof, zpages]
@@ -168,17 +168,17 @@ data:
         traces:
           receivers: [otlp]
           processors: [memory_limiter, batch, resource, attributes]
-          exporters: [otlp/tempo, logging]
+          exporters: [otlp/tempo, debug]
         
         metrics:
           receivers: [otlp]
           processors: [memory_limiter, batch, resource]
-          exporters: [prometheusremotewrite]
+          exporters: [prometheus, debug]
         
         logs:
           receivers: [otlp]
           processors: [memory_limiter, batch, resource]
-          exporters: [loki]
+          exporters: [otlphttp, debug]
 
 ---
 # Prometheus Deployment
@@ -562,6 +562,9 @@ spec:
   - name: http
     port: 3100
     targetPort: 3100
+  - name: grpc
+    port: 9096
+    targetPort: 9096
   type: ClusterIP
 
 ---
@@ -577,6 +580,21 @@ data:
 
     server:
       http_listen_port: 3100
+      grpc_listen_port: 9096
+
+    distributor:
+      ring:
+        kvstore:
+          store: inmemory
+
+    ingester:
+      lifecycler:
+        ring:
+          kvstore:
+            store: inmemory
+          replication_factor: 1
+      chunk_idle_period: 5m
+      chunk_retain_period: 30s
 
     common:
       path_prefix: /loki
@@ -603,6 +621,8 @@ data:
       retention_period: 168h  # 7 days
       reject_old_samples: true
       reject_old_samples_max_age: 168h
+      ingestion_rate_mb: 10
+      ingestion_burst_size_mb: 20
 
 ---
 # Grafana Deployment
