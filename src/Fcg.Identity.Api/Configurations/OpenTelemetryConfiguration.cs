@@ -17,12 +17,14 @@ public static class OpenTelemetryConfiguration
             configuration["OTEL_RESOURCE_ATTRIBUTES"]
                 ?.Split(',')
                 .FirstOrDefault(x => x.StartsWith("service.version="))
-                ?.Split('=')[1] ?? "1.0.0";
+                ?.Split('=')[1]
+            ?? "1.0.0";
         var deploymentEnvironment =
             configuration["OTEL_RESOURCE_ATTRIBUTES"]
                 ?.Split(',')
                 .FirstOrDefault(x => x.StartsWith("deployment.environment="))
-                ?.Split('=')[1] ?? environment.EnvironmentName;
+                ?.Split('=')[1]
+            ?? environment.EnvironmentName;
 
         var otlpEndpoint = configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
 

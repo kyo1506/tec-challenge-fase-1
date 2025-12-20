@@ -15,7 +15,8 @@ public static class LoggingConfiguration
             configuration["OTEL_RESOURCE_ATTRIBUTES"]
                 ?.Split(',')
                 .FirstOrDefault(x => x.StartsWith("service.version="))
-                ?.Split('=')[1] ?? "1.0.0";
+                ?.Split('=')[1]
+            ?? "1.0.0";
         var deploymentEnvironment =
             configuration["OTEL_RESOURCE_ATTRIBUTES"]
                 ?.Split(',')
