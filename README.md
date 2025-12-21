@@ -22,7 +22,7 @@
 
 ## 🎯 Visão Geral da Arquitetura
 
-O **FCG Identity Microservice** é um sistema de autenticação e autorização enterprise desenvolvido em **.NET 9** seguindo os princípios de **Clean Architecture** e **Domain-Driven Design (DDD)**. O sistema utiliza **Keycloak** como Identity Provider e está deployado em **AWS EKS** com **Kong Ingress Controller**.
+O **FCG Identity Microservice** é um sistema de autenticação e autorização enterprise desenvolvido em **.NET 10** seguindo os princípios de **Clean Architecture** e **Domain-Driven Design (DDD)**. O sistema utiliza **Keycloak** como Identity Provider e está deployado em **AWS EKS** com **Kong Ingress Controller**.
 
 ```mermaid
 graph TB
@@ -38,7 +38,7 @@ graph TB
     end
 
     subgraph "Application Layer"
-        IDENTITY[Identity API<br/>.NET 9]
+        IDENTITY[Identity API<br/>.NET 10]
         KC[Keycloak<br/>Identity Provider]
     end
 
@@ -96,7 +96,7 @@ C4Context
     Person(user, "User", "End user accessing the platform")
     Person(admin, "Administrator", "System administrator")
     
-    System(identity, "FCG Identity API", ".NET 9 microservice for authentication and user management")
+    System(identity, "FCG Identity API", ".NET 10 microservice for authentication and user management")
     System_Ext(keycloak, "Keycloak", "Identity Provider & OpenID Connect server")
     System_Ext(kong, "Kong Ingress", "API Gateway with rate limiting and CORS")
     
@@ -134,7 +134,7 @@ C4Context
 ```mermaid
 flowchart TB
     subgraph "Application Layer"
-        APP[Identity API<br/>.NET 9]
+        APP[Identity API<br/>.NET 10]
         KC_APP[Keycloak]
     end
     
@@ -413,8 +413,8 @@ flowchart TD
 
 | Componente | Versão | Descrição |
 |------------|--------|-----------|
-| **.NET** | 9.0 | Framework principal |
-| **ASP.NET Core** | 9.0.9 | Web API framework |
+| **.NET** | 10.0 | Framework principal |
+| **ASP.NET Core** | 10.0.1 | Web API framework |
 | **Keycloak** | 22.0 | Identity Provider |
 | **PostgreSQL** | 13-alpine | Database para Keycloak |
 | **Kong Ingress** | Latest | API Gateway |
@@ -438,7 +438,7 @@ flowchart TD
 | **Metrics Scrape Interval** | 15s | Prometheus collection |
 | **Log Indexing Latency** | <3s | Loki real-time indexing |
 | **Trace Sampling Rate** | 100% | All traces captured in Tempo |
-| **Memory Usage** | <4GB per pod | Otimizado para .NET 9 |
+| **Memory Usage** | <4GB per pod | Otimizado para .NET 10 |
 | **CPU Usage** | <50% average | m7i.flex.large instances |
 
 ---
