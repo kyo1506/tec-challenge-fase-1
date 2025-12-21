@@ -47,8 +47,11 @@ graph TB
     end
 
     subgraph "Observability Layer"
-        ELK[Elasticsearch<br/>Log Centralization]
-        NR[New Relic APM<br/>Metrics & Tracing]
+        PROM[Prometheus<br/>Metrics Collection]
+        LOKI[Loki<br/>Log Aggregation]
+        TEMPO[Tempo<br/>Distributed Tracing]
+        GRAFANA[Grafana<br/>Visualization & Explore]
+        OTEL[OpenTelemetry Collector<br/>Telemetry Pipeline]
     end
 
     subgraph "Infrastructure Layer"
@@ -64,15 +67,20 @@ graph TB
     KONG --> KC
     IDENTITY -.-> KC
     KC --> KCDB
-    IDENTITY --> ELK
-    IDENTITY --> NR
-    KC --> ELK
+    IDENTITY --> OTEL
+    OTEL --> PROM
+    OTEL --> LOKI
+    OTEL --> TEMPO
+    GRAFANA --> PROM
+    GRAFANA --> LOKI
+    GRAFANA --> TEMPO
     
     style IDENTITY fill:#e1f5fe
     style KC fill:#fff3e0
     style KONG fill:#f3e5f5
     style EKS fill:#e8f5e8
-    style ELK fill:#00bcd4,color:#fff
+    style GRAFANA fill:#f46800,color:#fff
+    style PROM fill:#e6522c,color:#fff
 ```
 
 ---
@@ -94,8 +102,10 @@ C4Context
     
     SystemDb(kcdb, "Keycloak Database", "PostgreSQL database storing user data")
     
-    System_Ext(elasticsearch, "Elasticsearch Cloud", "Centralized logging and search")
-    System_Ext(newrelic, "New Relic", "APM and monitoring platform")
+    System_Ext(grafana, "Grafana", "Observability visualization platform")
+    System_Ext(prometheus, "Prometheus", "Metrics collection and monitoring")
+    System_Ext(loki, "Loki", "Log aggregation system")
+    System_Ext(tempo, "Tempo", "Distributed tracing backend")
     System_Ext(github, "GitHub Actions", "CI/CD pipeline")
     System_Ext(aws, "AWS EKS", "Kubernetes cluster hosting")
 
@@ -105,8 +115,13 @@ C4Context
     Rel(kong, keycloak, "Routes auth requests", "HTTP")
     Rel(identity, keycloak, "Validates tokens & manages users", "HTTP")
     Rel(keycloak, kcdb, "Stores user data", "SQL")
-    Rel(identity, elasticsearch, "Ships structured logs", "HTTPS")
-    Rel(identity, newrelic, "Sends telemetry", "HTTPS")
+    Rel(identity, prometheus, "Exposes metrics", "HTTP")
+    Rel(identity, loki, "Ships logs via OTLP", "HTTP")
+    Rel(identity, tempo, "Ships traces via OTLP", "HTTP")
+    Rel(admin, grafana, "Monitors system", "HTTPS")
+    Rel(grafana, prometheus, "Queries metrics", "HTTP")
+    Rel(grafana, loki, "Queries logs", "HTTP")
+    Rel(grafana, tempo, "Queries traces", "HTTP")
     Rel(github, aws, "Deploys containers", "kubectl")
 ```
 
@@ -114,7 +129,7 @@ C4Context
 
 ## 📊 Monitoramento e Observabilidade
 
-### 📈 Observability Stack Completa
+### 📈 Observability Stack Completa - Prometheus, Loki, Tempo & Grafana
 
 ```mermaid
 flowchart TB
@@ -123,15 +138,9 @@ flowchart TB
         KC_APP[Keycloak]
     end
     
-    subgraph "Logging Layer"
-        SERILOG[Serilog<br/>Structured Logging]
-        CONSOLE[Console Sink<br/>JSON Format]
-        ELASTIC_SINK[Elasticsearch Sink<br/>fcg-logs-daily-index]
-    end
-    
-    subgraph "Metrics & Tracing"
-        NR_AGENT[New Relic Agent]
-        NR_API[New Relic API]
+    subgraph "Telemetry Collection"
+        OTEL[OpenTelemetry Collector<br/>OTLP Receiver]
+        CONSOLE[Console Logs<br/>JSON Format]
     end
     
     subgraph "Kong Observability"
@@ -142,127 +151,177 @@ flowchart TB
     subgraph "Kubernetes Monitoring"
         K8S_LOGS[Pod Logs]
         HEALTH_CHECKS[Health Probes<br/>Liveness/Readiness]
+        PROMTAIL[Promtail<br/>Log Scraper]
     end
     
-    subgraph "Log Centralization (GCP)"
-        ELASTICSEARCH[Elasticsearch Cloud<br/>us-central1.gcp.elastic.cloud]
-        ELASTIC_API[Elasticsearch API<br/>API Key Authentication]
+    subgraph "Storage Backends"
+        PROMETHEUS[Prometheus<br/>Time Series Database]
+        LOKI[Loki<br/>Log Aggregator]
+        TEMPO[Tempo<br/>Trace Storage]
     end
     
-    subgraph "External Monitoring"
-        NR_DASHBOARD[New Relic Dashboard]
-        ALERTS[Custom Alerts]
+    subgraph "Visualization"
+        GRAFANA[Grafana<br/>Unified Observability UI]
+        EXPLORE[Explore Interface<br/>Ad-hoc Queries]
     end
 
-    APP --> SERILOG
-    APP --> NR_AGENT
+    APP -->|Metrics| OTEL
+    APP -->|Traces| OTEL
+    APP --> CONSOLE
     KC_APP --> K8S_LOGS
-    SERILOG --> CONSOLE
-    SERILOG --> ELASTIC_SINK
-    ELASTIC_SINK --> ELASTIC_API
-    ELASTIC_API --> ELASTICSEARCH
-    NR_AGENT --> NR_API
-    KONG_LOGS --> HEADERS
     CONSOLE --> K8S_LOGS
-    K8S_LOGS --> NR_DASHBOARD
-    NR_API --> NR_DASHBOARD
-    NR_DASHBOARD --> ALERTS
+    K8S_LOGS --> PROMTAIL
+    PROMTAIL -->|Scrape Logs| LOKI
+    OTEL -->|Store Metrics| PROMETHEUS
+    OTEL -->|Store Traces| TEMPO
+    KONG_LOGS --> HEADERS
+    GRAFANA -->|Query| PROMETHEUS
+    GRAFANA -->|Query| LOKI
+    GRAFANA -->|Query| TEMPO
+    GRAFANA --> EXPLORE
+    HEALTH_CHECKS -.->|Monitor| PROMETHEUS
     
     style APP fill:#1976d2,color:#fff
-    style ELASTICSEARCH fill:#00bcd4,color:#fff
-    style NR_DASHBOARD fill:#4caf50,color:#fff
-    style ALERTS fill:#f44336,color:#fff
+    style GRAFANA fill:#f46800,color:#fff
+    style PROMETHEUS fill:#e6522c,color:#fff
+    style LOKI fill:#00a273,color:#fff
+    style TEMPO fill:#f44336,color:#fff
+    style OTEL fill:#425cc7,color:#fff
 ```
 
-### 🔍 Log Flow & Correlation com Elasticsearch
+### 🔍 Telemetry Flow & Correlation com OpenTelemetry
 
 ```mermaid
 sequenceDiagram
     participant Client
     participant Kong
     participant API as Identity API
-    participant Serilog
+    participant OTEL as OpenTelemetry Collector
     participant Console as Console Logs
-    participant Elastic as Elasticsearch
-    participant K8s as Kubernetes
-    participant NR as New Relic
+    participant Promtail
+    participant Prom as Prometheus
+    participant Loki
+    participant Tempo
+    participant Grafana
 
     Client->>+Kong: HTTP Request
     Kong->>Kong: Generate Request ID<br/>X-Kong-Request-Id: uuid
     Kong->>Kong: Generate Correlation ID<br/>X-Correlation-ID: uuid#counter
     Kong->>+API: Forward with Headers
     
-    API->>API: Extract Headers<br/>Set Log Context
-    API->>+Serilog: Log with Context<br/>{RequestId, CorrelationId, UserId}
+    API->>API: Extract Headers<br/>Set Trace Context
     
-    par Dual Logging Strategy
-        Serilog->>+Console: JSON Console Output
-        Console->>+K8s: Kubernetes Logs
-    and 
-        Serilog->>+Elastic: Ship to Elasticsearch<br/>Index: fcg-logs-daily-index
+    par Telemetry Collection
+        API->>+OTEL: Export Metrics<br/>(http_server_*, custom metrics)
+        OTEL->>+Prom: Store Time Series
+    and
+        API->>+OTEL: Export Traces<br/>(OTLP Protocol)
+        OTEL->>+Tempo: Store Traces
+    and
+        API->>+Console: JSON Structured Logs
+        Console->>+Promtail: Scrape Pod Logs
+        Promtail->>+Loki: Ship Logs
     end
     
-    API->>+NR: Send Telemetry<br/>(Performance, Errors)
+    Note over Grafana: Unified Observability Platform
+    Grafana->>Prom: Query Metrics<br/>(PromQL)
+    Grafana->>Loki: Query Logs<br/>(LogQL)
+    Grafana->>Tempo: Query Traces<br/>(TraceQL)
     
-    K8s-->>-NR: Forward Logs<br/>(Optional Log Forwarding)
+    Note over Grafana: Correlation via trace_id, span_id
+    Note over OTEL,Loki: Full observability stack in-cluster
     
-    Note over Elastic,NR: Centralized logging & APM monitoring
-    Note over Serilog,NR: Correlation across all services
-    
-    Serilog-->>-API: Log Written
     API-->>-Kong: Response
     Kong-->>-Client: Response + Headers<br/>(Request-Id, Latency)
 ```
 
-### 📊 Elasticsearch Configuration
+### 📊 OpenTelemetry Configuration
 
-```json
-{
-  "Serilog": {
-    "Using": [
-      "Serilog.Sinks.Console", 
-      "Serilog.Sinks.Elasticsearch", 
-      "NewRelic.LogEnrichers.Serilog"
-    ],
-    "MinimumLevel": {
-      "Default": "Information",
-      "Override": {
-        "Microsoft": "Warning",
-        "Microsoft.Hosting.Lifetime": "Information",
-        "Microsoft.AspNetCore.Authentication": "Information",
-        "System": "Warning"
-      }
-    },
-    "WriteTo": [
-      {
-        "Name": "Console",
-        "Args": {
-          "outputTemplate": "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception} | RequestId: {RequestId} | CorrelationId: {CorrelationId} | UserId: {UserId} | Username: {Username} | SessionId: {SessionId} | Application: {ApplicationName}"
-        }
-      },
-      {
-        "Name": "Elasticsearch",
-        "Args": {
-          "nodeUris": "https://my-elasticsearch-project-ba9d4e.es.us-central1.gcp.elastic.cloud",
-          "indexFormat": "fcg-logs-{0:yyyy.MM.dd}",
-          "typeName": null,
-          "autoRegisterTemplate": true,
-          "apiKey": "${ELASTICSEARCH_API_KEY}"
-        }
-      }
-    ],
-    "Enrich": [
-      "FromLogContext", 
-      "WithMachineName", 
-      "WithEnvironmentName",
-      "WithNewRelicLogsInContext"
-    ],
-    "Properties": {
-      "ServiceName": "fcg-identity-service",
-      "Application": "FCG Identity API"
-    }
-  }
-}
+```yaml
+# OpenTelemetry Collector Configuration
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 10s
+    send_batch_size: 1024
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+
+exporters:
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    namespace: fcg_identity
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  loki:
+    endpoint: http://loki:3100/loki/api/v1/push
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/tempo]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [loki]
+```
+
+**Datasources Grafana:**
+```yaml
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    uid: prometheus
+    isDefault: true
+    editable: false
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    uid: loki
+    editable: false
+    jsonData:
+      derivedFields:
+        - datasourceUid: tempo
+          matcherRegex: "trace_id=(\\w+)"
+          name: TraceID
+          url: "$${__value.raw}"
+
+  - name: Tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    uid: tempo
+    editable: false
+    jsonData:
+      tracesToLogs:
+        datasourceUid: loki
+        filterByTraceID: true
+        filterBySpanID: false
+      tracesToMetrics:
+        datasourceUid: prometheus
+      serviceMap:
+        datasourceUid: prometheus
 ```
 
 ---
@@ -278,10 +337,10 @@ sequenceDiagram
     participant API as Identity API
     participant KC as Keycloak
     participant DB as PostgreSQL
-    participant Elastic as Elasticsearch
-    participant NR as New Relic
+    participant OTEL as OpenTelemetry
+    participant Grafana
 
-    Note over Client,NR: User Authentication Flow with Full Observability
+    Note over Client,Grafana: User Authentication Flow with Full Observability
     
     Client->>+Kong: POST /identity/v1/auth/login<br/>{email, password}
     Kong->>Kong: Rate Limiting Check<br/>(200/min, 2000/hour)
@@ -297,15 +356,15 @@ sequenceDiagram
     
     API->>API: Map to Response Model
     
-    par Dual Observability
-        API->>+Elastic: Ship Structured Log<br/>Authentication Success/Failure
-        API->>+NR: Log Authentication Event<br/>Performance Metrics
+    par Telemetry Collection
+        API->>+OTEL: Export Trace<br/>Authentication Span
+        API->>+OTEL: Export Metrics<br/>auth_success_total
     end
     
     API-->>-Kong: 200 OK<br/>TokenResponse
     Kong-->>-Client: Response + Kong Headers<br/>(RateLimit-Remaining, etc.)
     
-    Note over Elastic,NR: Logs centralized in Elasticsearch + APM in New Relic
+    Note over OTEL,Grafana: Observability via Prometheus + Loki + Tempo
 ```
 
 ---
@@ -331,8 +390,8 @@ flowchart TD
     end
     
     subgraph "Observability Integration"
-        LOG_ALLOW[Log Allowed Request<br/>→ Elasticsearch]
-        LOG_DENY[Log Rate Limited Request<br/>→ Elasticsearch + Alert]
+        LOG_ALLOW[Log Allowed Request<br/>→ Loki via Promtail]
+        LOG_DENY[Log Rate Limited Request<br/>→ Loki + Prometheus Counter]
     end
     
     HEADERS --> FORWARD[Forward to Backend]
@@ -361,9 +420,12 @@ flowchart TD
 | **Kong Ingress** | Latest | API Gateway |
 | **Kubernetes** | v1.34 | Container orchestration |
 | **AWS EKS** | v1.34 | Managed Kubernetes |
-| **New Relic Agent** | 10.45.0 | APM monitoring |
-| **Serilog** | 9.0.0 | Structured logging |
-| **Elasticsearch** | 8.x | Log centralization (GCP Cloud) |
+| **Prometheus** | 3.2.1 | Metrics collection |
+| **Loki** | 3.3.1 | Log aggregation |
+| **Tempo** | 2.7.2 | Distributed tracing |
+| **Grafana** | 11.3.1 | Observability visualization |
+| **OpenTelemetry Collector** | 0.115.1 | Telemetry pipeline |
+| **Promtail** | 3.3.1 | Log scraper |
 
 ### 📊 Performance Specifications
 
@@ -371,16 +433,19 @@ flowchart TD
 |---------|-------|------------|
 | **Response Time** | ~100-200ms (p95) | Incluindo validação Keycloak |
 | **Throughput** | 200 req/min | Rate limit por IP |
-| **Uptime SLA** | 99.9% | Monitorado via New Relic |
+| **Uptime SLA** | 99.9% | Monitorado via Prometheus |
 | **Kong Proxy Latency** | ~1ms | Overhead mínimo |
-| **Log Indexing Latency** | <5s | Elasticsearch real-time indexing |
+| **Metrics Scrape Interval** | 15s | Prometheus collection |
+| **Log Indexing Latency** | <3s | Loki real-time indexing |
+| **Trace Sampling Rate** | 100% | All traces captured in Tempo |
 | **Memory Usage** | <4GB per pod | Otimizado para .NET 9 |
 | **CPU Usage** | <50% average | m7i.flex.large instances |
 
 ---
 
-**Documento Gerado em:** `07/10/2025`  
+**Documento Gerado em:** `21/12/2025`  
 **Versão da Aplicação:** `1.0.0`  
-**Ambiente:** `Production (AWS EKS + Elasticsearch Cloud)`  
-**Stack de Observabilidade:** `✅ Elasticsearch + New Relic + Kong`  
+**Ambiente:** `Production (AWS EKS)`  
+**Stack de Observabilidade:** `✅ Prometheus + Loki + Tempo + Grafana + OpenTelemetry`  
+**Dashboards:** `Manual creation via Grafana Explore UI`  
 **Status:** `✅ Produção com Observabilidade Completa`

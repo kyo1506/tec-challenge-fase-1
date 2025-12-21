@@ -1,7 +1,3 @@
-# Identity System Migration to Kong Ingress Controller
-# Migrando: Keycloak + Identity API + Kong Admin (opcional)
-
----
 # Keycloak Ingress
 apiVersion: networking.k8s.io/v1
 kind: Ingress

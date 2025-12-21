@@ -96,7 +96,6 @@ jobs:
 
           # Aplicar manifestos na ordem correta
           kubectl apply -f k8s/production/namespace.yaml
-          kubectl apply -f k8s/production/secrets.yaml
           kubectl apply -f k8s/production/configmaps.yaml
           kubectl apply -f k8s/production/volumes.yaml
           kubectl apply -f k8s/production/databases.yaml
